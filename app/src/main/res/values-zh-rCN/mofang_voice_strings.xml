@@ -1,0 +1,32 @@
+<resources>
+    <string name="feature_mofang_voice_name">魔方配音</string>
+    <string name="feature_mofang_voice_description">将聊天文字或自定义文字生成并发送为语音消息，功能默认关闭</string>
+    <string name="mofang_voice_menu">转语音</string>
+    <string name="mofang_voice_text_label">配音文字</string>
+    <string name="mofang_voice_system_roles">系统角色</string>
+    <string name="mofang_voice_clone_roles">克隆角色</string>
+    <string name="mofang_voice_get_roles">获取角色列表</string>
+    <string name="mofang_voice_loading">加载中…</string>
+    <string name="mofang_voice_emotion">语气情感</string>
+    <string name="mofang_voice_emotion_neutral">中性</string>
+    <string name="mofang_voice_emotion_happy">开心</string>
+    <string name="mofang_voice_emotion_angry">生气</string>
+    <string name="mofang_voice_emotion_sad">悲伤</string>
+    <string name="mofang_voice_emotion_surprised">惊讶</string>
+    <string name="mofang_voice_generate">生成</string>
+    <string name="mofang_voice_send">发送语音</string>
+    <string name="mofang_voice_preview">语音试听</string>
+    <string name="mofang_voice_tap_to_play">点击播放</string>
+    <string name="mofang_voice_open_settings">打开设置</string>
+    <string name="mofang_voice_api_key_title">魔方配音 API Key</string>
+    <string name="mofang_voice_api_key_label">API Key</string>
+    <string name="mofang_voice_api_key_required">请先通过“打开设置”配置 API Key</string>
+    <string name="mofang_voice_request_failed">获取角色列表失败</string>
+    <string name="mofang_voice_generate_failed">生成语音失败</string>
+    <string name="mofang_voice_text_required">请输入配音文字</string>
+    <string name="mofang_voice_text_too_long">文字不能超过 1000 字</string>
+    <string name="mofang_voice_voice_required">请选择一个角色</string>
+    <string name="mofang_voice_convert_failed">音频转换失败</string>
+    <string name="mofang_voice_send_failed">语音发送失败</string>
+    <string name="mofang_voice_send_success">语音发送成功</string>
+</resources>

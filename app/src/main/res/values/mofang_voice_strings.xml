@@ -1,0 +1,32 @@
+<resources>
+    <string name="feature_mofang_voice_name">Mofang Voice</string>
+    <string name="feature_mofang_voice_description">Convert a text message or custom text into a voice message</string>
+    <string name="mofang_voice_menu">Text to voice</string>
+    <string name="mofang_voice_text_label">Text</string>
+    <string name="mofang_voice_system_roles">System roles</string>
+    <string name="mofang_voice_clone_roles">Cloned roles</string>
+    <string name="mofang_voice_get_roles">Get role list</string>
+    <string name="mofang_voice_loading">Loading…</string>
+    <string name="mofang_voice_emotion">Emotion</string>
+    <string name="mofang_voice_emotion_neutral">Neutral</string>
+    <string name="mofang_voice_emotion_happy">Happy</string>
+    <string name="mofang_voice_emotion_angry">Angry</string>
+    <string name="mofang_voice_emotion_sad">Sad</string>
+    <string name="mofang_voice_emotion_surprised">Surprised</string>
+    <string name="mofang_voice_generate">Generate</string>
+    <string name="mofang_voice_send">Send voice</string>
+    <string name="mofang_voice_preview">Voice preview</string>
+    <string name="mofang_voice_tap_to_play">Tap to play</string>
+    <string name="mofang_voice_open_settings">Open settings</string>
+    <string name="mofang_voice_api_key_title">Mofang Voice API Key</string>
+    <string name="mofang_voice_api_key_label">API Key</string>
+    <string name="mofang_voice_api_key_required">Configure the API Key from Open settings first</string>
+    <string name="mofang_voice_request_failed">Failed to get role list</string>
+    <string name="mofang_voice_generate_failed">Failed to generate voice</string>
+    <string name="mofang_voice_text_required">Please enter text</string>
+    <string name="mofang_voice_text_too_long">Text cannot exceed 1000 characters</string>
+    <string name="mofang_voice_voice_required">Please select a role</string>
+    <string name="mofang_voice_convert_failed">Failed to convert the audio</string>
+    <string name="mofang_voice_send_failed">Failed to send voice</string>
+    <string name="mofang_voice_send_success">Voice sent</string>
+</resources>
