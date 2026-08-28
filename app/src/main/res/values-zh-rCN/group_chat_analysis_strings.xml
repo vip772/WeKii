@@ -1,0 +1,23 @@
+<resources>
+    <string name="feature_group_chat_analysis_name">群聊分析</string>
+    <string name="feature_group_chat_analysis_description">统计群成员、发言人数和活跃度，并使用 AI 总结聊天内容</string>
+    <string name="group_chat_analysis_menu">群聊分析</string>
+    <string name="group_chat_analysis_period">最近 %1$d 天</string>
+    <string name="group_chat_analysis_total_members">总人数</string>
+    <string name="group_chat_analysis_speaking_members">发言人数</string>
+    <string name="group_chat_analysis_messages">消息数</string>
+    <string name="group_chat_analysis_activity">活跃度：%1$d%%</string>
+    <string name="group_chat_analysis_ranking">发言排行</string>
+    <string name="group_chat_analysis_extra_prompt">额外总结要求（可选）</string>
+    <string name="group_chat_analysis_generate_summary">生成 AI 总结</string>
+    <string name="group_chat_analysis_summary">聊天总结</string>
+    <string name="group_chat_analysis_settings">设置</string>
+    <string name="group_chat_analysis_api_url">OpenAI 兼容接口地址</string>
+    <string name="group_chat_analysis_api_key">API Key</string>
+    <string name="group_chat_analysis_model">模型</string>
+    <string name="group_chat_analysis_days">统计天数（1–365）</string>
+    <string name="group_chat_analysis_limit">提取消息上限（100–10000）</string>
+    <string name="group_chat_analysis_config_required">请先配置接口地址、API Key 和模型</string>
+    <string name="group_chat_analysis_load_failed">群聊数据读取失败</string>
+    <string name="group_chat_analysis_summary_failed">AI 总结失败</string>
+</resources>

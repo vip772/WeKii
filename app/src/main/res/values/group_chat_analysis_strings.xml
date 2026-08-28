@@ -1,0 +1,23 @@
+<resources>
+    <string name="feature_group_chat_analysis_name">Group Chat Analysis</string>
+    <string name="feature_group_chat_analysis_description">Analyze group members, speakers and activity, then summarize chat content with AI</string>
+    <string name="group_chat_analysis_menu">Analyze group chat</string>
+    <string name="group_chat_analysis_period">Last %1$d days</string>
+    <string name="group_chat_analysis_total_members">Members</string>
+    <string name="group_chat_analysis_speaking_members">Speakers</string>
+    <string name="group_chat_analysis_messages">Messages</string>
+    <string name="group_chat_analysis_activity">Activity: %1$d%%</string>
+    <string name="group_chat_analysis_ranking">Speaker ranking</string>
+    <string name="group_chat_analysis_extra_prompt">Extra summary requirements (optional)</string>
+    <string name="group_chat_analysis_generate_summary">Generate AI summary</string>
+    <string name="group_chat_analysis_summary">Chat summary</string>
+    <string name="group_chat_analysis_settings">Settings</string>
+    <string name="group_chat_analysis_api_url">OpenAI-compatible endpoint</string>
+    <string name="group_chat_analysis_api_key">API Key</string>
+    <string name="group_chat_analysis_model">Model</string>
+    <string name="group_chat_analysis_days">Analysis days (1–365)</string>
+    <string name="group_chat_analysis_limit">Message extraction limit (100–10000)</string>
+    <string name="group_chat_analysis_config_required">Configure the endpoint, API key and model first</string>
+    <string name="group_chat_analysis_load_failed">Failed to load group chat data</string>
+    <string name="group_chat_analysis_summary_failed">AI summary failed</string>
+</resources>
