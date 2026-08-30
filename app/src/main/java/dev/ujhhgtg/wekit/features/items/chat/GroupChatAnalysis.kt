@@ -30,6 +30,7 @@ import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.features.api.core.WeApi
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
+import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import androidx.activity.ComponentActivity
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
@@ -54,12 +55,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
+@Feature(
+    id = "群聊分析",
+    nameRes = "feature_group_chat_analysis_name",
+    categoryIds = [FeatureCategoryIds.CHAT],
+    descriptionRes = "feature_group_chat_analysis_description",
+)
 object GroupChatAnalysis : ClickableFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
-    override val technicalId = "群聊分析"
-    override val nameRes = R.string.feature_group_chat_analysis_name
-    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
-    override val descriptionRes = R.string.feature_group_chat_analysis_description
-
     private const val TAG = "GroupChatAnalysis"
     private const val MENU_ID = 777032
     private val blankIcon = ColorDrawable(Color.TRANSPARENT)
