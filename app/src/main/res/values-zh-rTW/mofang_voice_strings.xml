@@ -10,6 +10,7 @@
     <string name="mofang_voice_emotion">語氣情感</string>
     <string name="mofang_voice_status">狀態</string>
     <string name="mofang_voice_ready">就緒</string>
+    <string name="mofang_voice_not_selected">未選擇</string>
     <string name="mofang_voice_emotion_neutral">中性</string>
     <string name="mofang_voice_emotion_happy">開心</string>
     <string name="mofang_voice_emotion_angry">生氣</string>

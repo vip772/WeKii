@@ -10,6 +10,7 @@
     <string name="mofang_voice_emotion">Emotion</string>
     <string name="mofang_voice_status">Status</string>
     <string name="mofang_voice_ready">Ready</string>
+    <string name="mofang_voice_not_selected">Not selected</string>
     <string name="mofang_voice_emotion_neutral">Neutral</string>
     <string name="mofang_voice_emotion_happy">Happy</string>
     <string name="mofang_voice_emotion_angry">Angry</string>

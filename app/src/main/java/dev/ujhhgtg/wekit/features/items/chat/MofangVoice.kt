@@ -17,7 +17,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button as MaterialButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -224,32 +228,28 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             label = { Text(stringResource(R.string.mofang_voice_text_label)) },
                             minLines = 2,
                         )
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
                             RoleButton(
                                 title = stringResource(R.string.mofang_voice_system_roles),
                                 selected = selectedBuiltInVoice,
-                                onClick = { rolePicker = false },
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    rolePicker = false
+                                    if (builtInVoices.isEmpty()) loadVoices(false)
+                                },
                             )
                             RoleButton(
                                 title = stringResource(R.string.mofang_voice_clone_roles),
                                 selected = selectedClonedVoice,
-                                onClick = { rolePicker = true },
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    rolePicker = true
+                                    if (clonedVoices.isEmpty()) loadVoices(true)
+                                },
                             )
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.mofang_voice_emotion), style = MaterialTheme.typography.titleSmall)
-                                Emotion.entries.forEach { emotion ->
-                                    Row(Modifier.fillMaxWidth().clickable { selectedEmotion = emotion }, verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(selectedEmotion == emotion, { selectedEmotion = emotion })
-                                        Text(stringResource(emotion.labelRes))
-                                    }
-                                }
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.mofang_voice_status), style = MaterialTheme.typography.titleSmall)
-                                Text(if (busy) stringResource(R.string.mofang_voice_loading) else stringResource(R.string.mofang_voice_ready))
-                            }
                         }
                         rolePicker?.let { cloned ->
                             VoiceSelector(
@@ -266,13 +266,36 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                                 },
                             )
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            EmotionSelector(
+                                selected = selectedEmotion,
+                                modifier = Modifier.weight(1f),
+                                onSelect = { selectedEmotion = it },
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.mofang_voice_status),
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                Text(
+                                    if (busy) stringResource(R.string.mofang_voice_loading)
+                                    else stringResource(selectedEmotion.labelRes),
+                                )
+                            }
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            PinkButton(
                                 onClick = { generate(false) },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.mofang_voice_generate)) }
-                            Button(
+                            PinkButton(
                                 onClick = {
                                     val file = generatedFile
                                     val currentInput = selectedVoice?.let {
@@ -292,7 +315,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                                     }
                                 },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.mofang_voice_send)) }
                         }
                         if (busy) {
@@ -378,14 +401,70 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     private fun RoleButton(
         title: String,
         selected: MofangVoiceApi.Voice?,
+        modifier: Modifier = Modifier,
         onClick: () -> Unit,
     ) {
-        MaterialTextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        PinkButton(onClick = onClick, modifier = modifier) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title)
-                Text(selected?.name ?: "未选择", maxLines = 1)
+                Text(selected?.name ?: stringResource(R.string.mofang_voice_not_selected), maxLines = 1)
             }
         }
+    }
+
+    @Composable
+    private fun EmotionSelector(
+        selected: Emotion,
+        modifier: Modifier = Modifier,
+        onSelect: (Emotion) -> Unit,
+    ) {
+        var expanded by remember { mutableStateOf(false) }
+        Box(modifier) {
+            PinkButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(stringResource(R.string.mofang_voice_emotion))
+                    Text(stringResource(selected.labelRes), maxLines = 1)
+                }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                Emotion.entries.forEach { emotion ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(emotion.labelRes)) },
+                        onClick = {
+                            onSelect(emotion)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PinkButton(
+        onClick: () -> Unit,
+        modifier: Modifier = Modifier,
+        enabled: Boolean = true,
+        content: @Composable () -> Unit,
+    ) {
+        MaterialButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                disabledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+            ),
+            content = { content() },
+        )
     }
 
     @Composable
