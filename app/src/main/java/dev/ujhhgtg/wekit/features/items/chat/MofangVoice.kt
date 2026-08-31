@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.TextButton as MaterialTextButton
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,10 +100,13 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     ) {
         showComposeDialog(chattingContext.activity) {
             val scope = rememberCoroutineScope()
-            var text by remember { mutableStateOf(message.content) }
+            var text by remember { mutableStateOf(message.actualContent) }
             var builtInVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
             var clonedVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
             var selectedVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
+            var selectedBuiltInVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
+            var selectedClonedVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
+            var rolePicker by remember { mutableStateOf<Boolean?>(null) }
             var selectedEmotion by remember { mutableStateOf(Emotion.NEUTRAL) }
             var generatedFile by remember { mutableStateOf<File?>(null) }
             var generatedInput by remember { mutableStateOf<GeneratedInput?>(null) }
@@ -133,7 +139,13 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                     result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
                     result.onSuccess { voices ->
                         if (cloned) clonedVoices = voices else builtInVoices = voices
-                        if (selectedVoice == null) selectedVoice = voices.firstOrNull()
+                        if (cloned) {
+                            selectedClonedVoice = selectedClonedVoice ?: voices.firstOrNull()
+                            selectedVoice = selectedClonedVoice
+                        } else {
+                            selectedBuiltInVoice = selectedBuiltInVoice ?: voices.firstOrNull()
+                            selectedVoice = selectedBuiltInVoice
+                        }
                     }.onFailure {
                         showToast(it.message ?: anchor.context.getString(R.string.mofang_voice_request_failed))
                     }
@@ -194,7 +206,15 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
             }
 
             AlertDialogContent(
-                title = { Text(stringResource(R.string.feature_mofang_voice_name)) },
+                title = {
+                    Box(Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(R.string.feature_mofang_voice_name),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                },
                 text = {
                     Column(
                         Modifier.heightIn(max = 640.dp).verticalScroll(rememberScrollState()),
@@ -205,43 +225,49 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             onValueChange = { text = it.take(1000) },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text(stringResource(R.string.mofang_voice_text_label)) },
-                            supportingText = { Text("${text.length}/1000") },
                             minLines = 2,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            VoiceSelector(
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            RoleButton(
                                 title = stringResource(R.string.mofang_voice_system_roles),
-                                voices = builtInVoices,
-                                selected = selectedVoice,
-                                loading = loadingBuiltIn,
-                                modifier = Modifier.weight(1f),
-                                onLoad = { loadVoices(false) },
-                                onSelect = { selectedVoice = it },
+                                selected = selectedBuiltInVoice,
+                                onClick = { rolePicker = false },
                             )
-                            VoiceSelector(
+                            RoleButton(
                                 title = stringResource(R.string.mofang_voice_clone_roles),
-                                voices = clonedVoices,
-                                selected = selectedVoice,
-                                loading = loadingCloned,
-                                modifier = Modifier.weight(1f),
-                                onLoad = { loadVoices(true) },
-                                onSelect = { selectedVoice = it },
+                                selected = selectedClonedVoice,
+                                onClick = { rolePicker = true },
                             )
                         }
-                        Text(
-                            stringResource(R.string.mofang_voice_emotion),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        LazyColumn(Modifier.heightIn(min = 132.dp, max = 132.dp)) {
-                            items(Emotion.entries) { emotion ->
-                                Row(
-                                    Modifier.fillMaxWidth().clickable { selectedEmotion = emotion },
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    RadioButton(selectedEmotion == emotion, { selectedEmotion = emotion })
-                                    Text(stringResource(emotion.labelRes))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.mofang_voice_emotion), style = MaterialTheme.typography.titleSmall)
+                                Emotion.entries.forEach { emotion ->
+                                    Row(Modifier.fillMaxWidth().clickable { selectedEmotion = emotion }, verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(selectedEmotion == emotion, { selectedEmotion = emotion })
+                                        Text(stringResource(emotion.labelRes))
+                                    }
                                 }
                             }
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.mofang_voice_status), style = MaterialTheme.typography.titleSmall)
+                                Text(if (busy) stringResource(R.string.mofang_voice_loading) else stringResource(R.string.mofang_voice_ready))
+                            }
+                        }
+                        rolePicker?.let { cloned ->
+                            VoiceSelector(
+                                title = if (cloned) stringResource(R.string.mofang_voice_clone_roles) else stringResource(R.string.mofang_voice_system_roles),
+                                voices = if (cloned) clonedVoices else builtInVoices,
+                                selected = if (cloned) selectedClonedVoice else selectedBuiltInVoice,
+                                loading = if (cloned) loadingCloned else loadingBuiltIn,
+                                modifier = Modifier.fillMaxWidth(),
+                                onLoad = { loadVoices(cloned) },
+                                onSelect = {
+                                    if (cloned) selectedClonedVoice = it else selectedBuiltInVoice = it
+                                    selectedVoice = it
+                                    rolePicker = null
+                                },
+                            )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(
@@ -348,6 +374,20 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                     }
                 },
             )
+        }
+    }
+
+    @Composable
+    private fun RoleButton(
+        title: String,
+        selected: MofangVoiceApi.Voice?,
+        onClick: () -> Unit,
+    ) {
+        MaterialTextButton(onClick = onClick, modifier = Modifier.weight(1f)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title)
+                Text(selected?.name ?: "未选择", maxLines = 1)
+            }
         }
     }
 

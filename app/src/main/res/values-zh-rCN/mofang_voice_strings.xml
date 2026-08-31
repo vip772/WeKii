@@ -8,6 +8,8 @@
     <string name="mofang_voice_get_roles">获取角色列表</string>
     <string name="mofang_voice_loading">加载中…</string>
     <string name="mofang_voice_emotion">语气情感</string>
+    <string name="mofang_voice_status">状态</string>
+    <string name="mofang_voice_ready">就绪</string>
     <string name="mofang_voice_emotion_neutral">中性</string>
     <string name="mofang_voice_emotion_happy">开心</string>
     <string name="mofang_voice_emotion_angry">生气</string>
