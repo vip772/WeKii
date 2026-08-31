@@ -139,7 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/apk
-            apk="app/build/outputs/apk/standard/release/app-standard-release.apk"
+          apk="app/build/outputs/apk/standard/release/app-standard-release.apk"
           test -f "$apk"
           cp -v "$apk" dist/apk/
       - name: Upload Release APKs
