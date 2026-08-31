@@ -2,6 +2,7 @@ package dev.ujhhgtg.wekit.features.items.chat
 
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.view.View
 import androidx.compose.foundation.clickable
@@ -76,6 +77,9 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     override val descriptionRes = R.string.feature_mofang_voice_description
     private const val MENU_ID = 777031
     private var apiKey by prefOption("mofang_voice_api_key", "")
+    private var selectedVoiceId by prefOption("mofang_voice_selected_id", "")
+    private var selectedVoiceName by prefOption("mofang_voice_selected_name", "")
+    private var selectedVoiceIsCloned by prefOption("mofang_voice_selected_is_cloned", false)
     private val blankIcon = ColorDrawable(Color.TRANSPARENT)
 
     override fun onEnable() = WeChatMessageContextMenuApi.addProvider(this)
@@ -85,7 +89,10 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
         WeChatMessageContextMenuApi.MenuItem(
             id = MENU_ID,
             text = localizedChatString(R.string.mofang_voice_menu),
-            drawable = blankIcon,
+            drawable = BitmapDrawable(
+                WeChatMessageContextMenuApi::class.java.classLoader
+                    ?.getResourceAsStream("res/drawable-nodpi/ic_mofang_voice.png"),
+            ),
             imageVector = MaterialSymbols.Outlined.Info,
             isSupported = { it.typeCode == 1 && it.content.isNotBlank() },
             multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
@@ -104,9 +111,18 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
             var text by remember { mutableStateOf(message.actualContent) }
             var builtInVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
             var clonedVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
-            var selectedVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
-            var selectedBuiltInVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
-            var selectedClonedVoice by remember { mutableStateOf<MofangVoiceApi.Voice?>(null) }
+            val rememberedVoice = remember {
+                selectedVoiceId.takeIf { it.isNotBlank() }?.let {
+                    MofangVoiceApi.Voice(it, selectedVoiceName)
+                }
+            }
+            var selectedVoice by remember { mutableStateOf(rememberedVoice) }
+            var selectedBuiltInVoice by remember {
+                mutableStateOf(rememberedVoice.takeUnless { selectedVoiceIsCloned })
+            }
+            var selectedClonedVoice by remember {
+                mutableStateOf(rememberedVoice.takeIf { selectedVoiceIsCloned })
+            }
             var rolePicker by remember { mutableStateOf<Boolean?>(null) }
             var selectedEmotion by remember { mutableStateOf(Emotion.NEUTRAL) }
             var generatedFile by remember { mutableStateOf<File?>(null) }
@@ -226,7 +242,8 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             onValueChange = { text = it.take(1000) },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text(stringResource(R.string.mofang_voice_text_label)) },
-                            minLines = 2,
+                            minLines = 1,
+                            maxLines = 6,
                         )
                         Row(
                             Modifier.fillMaxWidth(),
@@ -252,7 +269,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             )
                         }
                         rolePicker?.let { cloned ->
-                            VoiceSelector(
+                            VoicePickerDialog(
                                 title = if (cloned) stringResource(R.string.mofang_voice_clone_roles) else stringResource(R.string.mofang_voice_system_roles),
                                 voices = if (cloned) clonedVoices else builtInVoices,
                                 selected = if (cloned) selectedClonedVoice else selectedBuiltInVoice,
@@ -260,8 +277,17 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                                 modifier = Modifier.fillMaxWidth(),
                                 onLoad = { loadVoices(cloned) },
                                 onSelect = {
-                                    if (cloned) selectedClonedVoice = it else selectedBuiltInVoice = it
+                                    if (cloned) {
+                                        selectedClonedVoice = it
+                                        selectedBuiltInVoice = null
+                                    } else {
+                                        selectedBuiltInVoice = it
+                                        selectedClonedVoice = null
+                                    }
                                     selectedVoice = it
+                                    selectedVoiceId = it.id
+                                    selectedVoiceName = it.name
+                                    selectedVoiceIsCloned = cloned
                                     rolePicker = null
                                 },
                             )
@@ -275,16 +301,11 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                                 modifier = Modifier.weight(1f),
                                 onSelect = { selectedEmotion = it },
                             )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    stringResource(R.string.mofang_voice_status),
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                                Text(
-                                    if (busy) stringResource(R.string.mofang_voice_loading)
-                                    else stringResource(selectedEmotion.labelRes),
-                                )
-                            }
+                            StatusButton(
+                                busy = busy,
+                                emotion = selectedEmotion,
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                         Row(
                             Modifier.fillMaxWidth(),
@@ -447,6 +468,28 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     }
 
     @Composable
+    private fun StatusButton(
+        busy: Boolean,
+        emotion: Emotion,
+        modifier: Modifier = Modifier,
+    ) {
+        PinkButton(
+            onClick = {},
+            enabled = false,
+            modifier = modifier,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.mofang_voice_status))
+                Text(
+                    if (busy) stringResource(R.string.mofang_voice_loading)
+                    else stringResource(R.string.mofang_voice_current_status, stringResource(emotion.labelRes)),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+
+    @Composable
     private fun PinkButton(
         onClick: () -> Unit,
         modifier: Modifier = Modifier,
@@ -468,7 +511,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     }
 
     @Composable
-    private fun VoiceSelector(
+    private fun VoicePickerDialog(
         title: String,
         voices: List<MofangVoiceApi.Voice>,
         selected: MofangVoiceApi.Voice?,
@@ -477,18 +520,20 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
         onLoad: () -> Unit,
         onSelect: (MofangVoiceApi.Voice) -> Unit,
     ) {
-        Column(modifier) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            if (voices.isEmpty()) {
-                TextButton(onLoad, enabled = !loading) {
-                    Text(
-                        if (loading) stringResource(R.string.mofang_voice_loading)
-                        else stringResource(R.string.mofang_voice_get_roles),
-                    )
-                }
-            } else {
-                LazyColumn(Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 220.dp)) {
-                    items(voices, key = { it.id }) { voice ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { },
+            title = { Text(title, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+            text = {
+                if (voices.isEmpty()) {
+                    TextButton(onLoad, enabled = !loading) {
+                        Text(
+                            if (loading) stringResource(R.string.mofang_voice_loading)
+                            else stringResource(R.string.mofang_voice_get_roles),
+                        )
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 360.dp)) {
+                        items(voices, key = { it.id }) { voice ->
                         Row(
                             Modifier.fillMaxWidth().clickable { onSelect(voice) }
                                 .padding(vertical = 8.dp),
@@ -497,10 +542,12 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             RadioButton(selected?.id == voice.id, { onSelect(voice) })
                             Text(voice.name, maxLines = 1)
                         }
+                        }
                     }
                 }
-            }
-        }
+            },
+            confirmButton = {},
+        )
     }
 
     private data class GeneratedInput(

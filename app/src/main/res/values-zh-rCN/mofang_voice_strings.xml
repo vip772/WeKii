@@ -9,6 +9,7 @@
     <string name="mofang_voice_loading">加载中…</string>
     <string name="mofang_voice_emotion">语气情感</string>
     <string name="mofang_voice_status">状态</string>
+    <string name="mofang_voice_current_status">当前状态：%1$s</string>
     <string name="mofang_voice_ready">就绪</string>
     <string name="mofang_voice_not_selected">未选择</string>
     <string name="mofang_voice_emotion_neutral">中性</string>
