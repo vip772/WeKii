@@ -142,6 +142,7 @@ jobs:
           apk="app/build/outputs/apk/standard/release/app-standard-release.apk"
           test -f "$apk"
           cp -v "$apk" dist/apk/
+
       - name: Upload Release APKs
         uses: actions/upload-artifact@v7
         with:
