@@ -41,7 +41,6 @@ import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
@@ -66,13 +65,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-@Feature(
-    id = "魔方配音",
-    nameRes = "feature_mofang_voice_name",
-    categoryIds = [FeatureCategoryIds.CHAT],
-    descriptionRes = "feature_mofang_voice_description",
-)
 object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
+    override val technicalId = "魔方配音"
+    override val nameRes = R.string.feature_mofang_voice_name
+    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
+    override val descriptionRes = R.string.feature_mofang_voice_description
     private const val MENU_ID = 777031
     private var apiKey by prefOption("mofang_voice_api_key", "")
     private val blankIcon = ColorDrawable(Color.TRANSPARENT)
@@ -273,7 +270,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                             Button(
                                 onClick = { generate(false) },
                                 enabled = !busy,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                             ) { Text(stringResource(R.string.mofang_voice_generate)) }
                             Button(
                                 onClick = {
@@ -295,7 +292,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
                                     }
                                 },
                                 enabled = !busy,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                             ) { Text(stringResource(R.string.mofang_voice_send)) }
                         }
                         if (busy) {
@@ -383,7 +380,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
         selected: MofangVoiceApi.Voice?,
         onClick: () -> Unit,
     ) {
-        MaterialTextButton(onClick = onClick, modifier = Modifier.weight(1f)) {
+        MaterialTextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title)
                 Text(selected?.name ?: "未选择", maxLines = 1)
