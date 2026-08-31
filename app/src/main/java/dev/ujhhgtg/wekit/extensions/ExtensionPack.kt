@@ -11,6 +11,7 @@ import java.io.File
  */
 interface ExtensionPack {
     val id: String
+    val displayOrder: Int
 
     /** UI metadata: display name resource shown on the management screen and in dialogs. */
     val nameRes: Int
@@ -55,13 +56,6 @@ interface ExtensionPack {
      * the index entry's pack-specific metadata, when the remote index carries any.
      */
     fun install(verifiedTmp: File, version: String, sha256: String, meta: String? = null)
-
-    /**
-     * Recovers a complete interrupted publication before the downloader makes
-     * another HTTP request. Implementations may finish publishing it or move
-     * its already-verified payload back to [verifiedTmp].
-     */
-    fun recoverInterruptedInstall(verifiedTmp: File, version: String, sha256: String) {}
 
     /** Hook fired by [ExtensionPacks] after a successful install. */
     fun onInstalled() {}

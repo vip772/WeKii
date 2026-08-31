@@ -5,14 +5,15 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.BaseAdapter
+import android.widget.HeaderViewListAdapter
 import android.widget.ListView
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isGone
+import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.DexMethodDelegate
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.core.ApiFeature
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.ui.utils.findViewByChildIndexes
 import dev.ujhhgtg.wekit.utils.HookParam
@@ -24,13 +25,12 @@ import java.util.IdentityHashMap
 import java.util.WeakHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
-@Feature(
-    id = "会话列表 View 绑定监听服务",
-    nameRes = "feature_we_conversation_list_view_api_name",
-    categoryIds = [FeatureCategoryIds.API],
-    descriptionRes = "feature_we_conversation_list_view_api_description",
-)
 object WeConversationListViewApi : ApiFeature(), IResolveDex {
+
+    override val technicalId = "会话列表 View 绑定监听服务"
+    override val nameRes = R.string.feature_we_conversation_list_view_api_name
+    override val categoryIds = listOf(FeatureCategoryIds.API)
+    override val descriptionRes = R.string.feature_we_conversation_list_view_api_description
 
     data class BindContext(
         val position: Int,
@@ -39,17 +39,30 @@ object WeConversationListViewApi : ApiFeature(), IResolveDex {
         val nextConversation: Any?,
     )
 
+    data class AdapterPositionSnapshot(
+        val visiblePosition: Int,
+        val itemCount: Int,
+        val currentRawPosition: Int,
+        val previousRawPosition: Int?,
+        val nextRawPosition: Int?,
+    )
+
     fun interface IBindViewListener {
         fun onBind(param: HookParam, row: View, conversation: Any, context: BindContext)
+    }
+
+    fun interface IAdapterPositionProvider {
+        fun snapshot(adapter: BaseAdapter, currentRawPosition: Int): AdapterPositionSnapshot?
     }
 
     private const val TAG = "WeConversationListViewApi"
 
     private val listeners = CopyOnWriteArrayList<IBindViewListener>()
+    private val positionProviders = CopyOnWriteArrayList<IAdapterPositionProvider>()
     private var latestAdapter: WeakReference<BaseAdapter>? = null
     private var latestListView: WeakReference<ListView>? = null
 
-    private val methodLegacyGetView by dexMethod(allowFailure = true) {
+    internal val methodLegacyGetView by dexMethod(allowFailure = true) {
         searchPackages("com.tencent.mm.ui.conversation")
         matcher {
             name = "getView"
@@ -61,7 +74,7 @@ object WeConversationListViewApi : ApiFeature(), IResolveDex {
             )
         }
     }
-    private val methodMvvmGetView by dexMethod {
+    internal val methodMvvmGetView by dexMethod {
         matcher {
             declaredClass {
                 usingEqStrings(
@@ -89,11 +102,22 @@ object WeConversationListViewApi : ApiFeature(), IResolveDex {
         WeLogger.i(TAG, "listener remove ${if (removed) "succeeded" else "failed"}, current listener count: ${listeners.size}")
     }
 
+    fun addPositionProvider(provider: IAdapterPositionProvider) {
+        if (!positionProviders.contains(provider)) positionProviders.add(provider)
+    }
+
+    fun removePositionProvider(provider: IAdapterPositionProvider) {
+        positionProviders.remove(provider)
+    }
+
     fun refresh() {
         runOnUiThread {
             val adapter = latestAdapter?.get() ?: return@runOnUiThread
             val listView = latestListView?.get()
-            if (listView != null && listView.adapter !== adapter) return@runOnUiThread
+            val installedAdapter = listView?.adapter
+            val realInstalledAdapter = (installedAdapter as? HeaderViewListAdapter)?.wrappedAdapter
+                ?: installedAdapter
+            if (realInstalledAdapter != null && realInstalledAdapter !== adapter) return@runOnUiThread
             dividerCoordinator.applyListView(listView)
             adapter.notifyDataSetChanged()
         }
@@ -119,24 +143,43 @@ object WeConversationListViewApi : ApiFeature(), IResolveDex {
         method.hookAfter {
             val row = result as View
             val adapter = thisObject as BaseAdapter
-            val position = args[0] as Int
-            val conversation = adapter.getItem(position)!!
-            val bindContext = BindContext(
-                position = position,
-                itemCount = adapter.count,
-                previousConversation = if (position > 0) adapter.getItem(position - 1) else null,
-                nextConversation = if (position + 1 < adapter.count) adapter.getItem(position + 1) else null,
-            )
             if (latestAdapter?.get() !== adapter) latestAdapter = WeakReference(adapter)
             (args[2] as? ListView)?.let { listView ->
                 if (latestListView?.get() !== listView) latestListView = WeakReference(listView)
             }
 
-            for (listener in listeners) {
-                try {
-                    listener.onBind(this, row, conversation, bindContext)
-                } catch (error: Exception) {
-                    WeLogger.e(TAG, "listener ${listener.javaClass.name} threw", error)
+            if (listeners.isNotEmpty()) {
+                val rawPosition = args[0] as Int
+                val snapshot = positionProviders.firstNotNullOfOrNull { provider ->
+                    runCatching { provider.snapshot(adapter, rawPosition) }
+                        .onFailure { WeLogger.e(TAG, "position provider ${provider.javaClass.name} threw", it) }
+                        .getOrNull()
+                }
+                val currentRawPosition = snapshot?.currentRawPosition ?: rawPosition
+                val itemCount = snapshot?.itemCount ?: adapter.count
+                val previousRawPosition = if (snapshot != null) {
+                    snapshot.previousRawPosition
+                } else {
+                    (currentRawPosition - 1).takeIf { it >= 0 }
+                }
+                val nextRawPosition = if (snapshot != null) {
+                    snapshot.nextRawPosition
+                } else {
+                    (currentRawPosition + 1).takeIf { it < itemCount }
+                }
+                val conversation = adapter.getItem(currentRawPosition)!!
+                val bindContext = BindContext(
+                    position = snapshot?.visiblePosition ?: rawPosition,
+                    itemCount = itemCount,
+                    previousConversation = previousRawPosition?.let(adapter::getItem),
+                    nextConversation = nextRawPosition?.let(adapter::getItem),
+                )
+                for (listener in listeners) {
+                    try {
+                        listener.onBind(this, row, conversation, bindContext)
+                    } catch (error: Exception) {
+                        WeLogger.e(TAG, "listener ${listener.javaClass.name} threw", error)
+                    }
                 }
             }
             dividerCoordinator.apply(row, latestListView?.get())
