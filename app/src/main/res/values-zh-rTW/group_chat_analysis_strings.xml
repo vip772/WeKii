@@ -1,0 +1,31 @@
+<resources>
+    <string name="feature_group_chat_analysis_name">群聊分析</string>
+    <string name="feature_group_chat_analysis_description">在同一介面分析群聊活躍度、成員發言、聊天作息、情緒、訊息長度和內容偏好，並可產生 AI 報告。功能預設關閉。</string>
+    <string name="group_chat_analysis_menu">分析</string>
+    <string name="group_chat_analysis_title">群聊分析</string>
+    <string name="group_chat_analysis_no_model">尚未設定 AI 模型</string>
+    <string name="group_chat_analysis_extra_requirement">AI 重點關注內容（選填）</string>
+    <string name="group_chat_analysis_generate">開始分析</string>
+    <string name="group_chat_analysis_ai_report">AI 分析報告</string>
+    <string name="group_chat_analysis_core_metrics">核心指標</string>
+    <string name="group_chat_analysis_total_messages">訊息數</string>
+    <string name="group_chat_analysis_active_users">發言人數</string>
+    <string name="group_chat_analysis_text_messages">文字訊息</string>
+    <string name="group_chat_analysis_at_me">提及訊息</string>
+    <string name="group_chat_analysis_active_ranking">活躍發言排行</string>
+    <string name="group_chat_analysis_routine">聊天作息圖鑑</string>
+    <string name="group_chat_analysis_early_bird">早起鳥兒</string>
+    <string name="group_chat_analysis_night_owl">熬夜修仙</string>
+    <string name="group_chat_analysis_emotion">情緒指紋探測</string>
+    <string name="group_chat_analysis_laugh">快樂</string>
+    <string name="group_chat_analysis_question">疑惑</string>
+    <string name="group_chat_analysis_exclamation">激動</string>
+    <string name="group_chat_analysis_speechless">無語</string>
+    <string name="group_chat_analysis_length">廢話程度鑑定</string>
+    <string name="group_chat_analysis_content_preference">內容載體偏好</string>
+    <string name="group_chat_analysis_today">今日</string>
+    <string name="group_chat_analysis_week">最近 7 天</string>
+    <string name="group_chat_analysis_month">最近 30 天</string>
+    <string name="group_chat_analysis_year">最近一年</string>
+    <string name="group_chat_analysis_all">全部記錄</string>
+</resources>

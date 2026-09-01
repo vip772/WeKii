@@ -1,0 +1,31 @@
+<resources>
+    <string name="feature_group_chat_analysis_name">Group Chat Analysis</string>
+    <string name="feature_group_chat_analysis_description">Analyze group activity, member participation, routines, mood, message length and content preferences, with an optional AI report. Disabled by default.</string>
+    <string name="group_chat_analysis_menu">Analyze</string>
+    <string name="group_chat_analysis_title">Group Chat Analysis</string>
+    <string name="group_chat_analysis_no_model">No AI model configured</string>
+    <string name="group_chat_analysis_extra_requirement">Optional AI focus</string>
+    <string name="group_chat_analysis_generate">Start analysis</string>
+    <string name="group_chat_analysis_ai_report">AI report</string>
+    <string name="group_chat_analysis_core_metrics">Core metrics</string>
+    <string name="group_chat_analysis_total_messages">Messages</string>
+    <string name="group_chat_analysis_active_users">Active users</string>
+    <string name="group_chat_analysis_text_messages">Text messages</string>
+    <string name="group_chat_analysis_at_me">Mentions</string>
+    <string name="group_chat_analysis_active_ranking">Active speaker ranking</string>
+    <string name="group_chat_analysis_routine">Chat routine</string>
+    <string name="group_chat_analysis_early_bird">Early bird</string>
+    <string name="group_chat_analysis_night_owl">Night owl</string>
+    <string name="group_chat_analysis_emotion">Mood fingerprint</string>
+    <string name="group_chat_analysis_laugh">Laugh</string>
+    <string name="group_chat_analysis_question">Question</string>
+    <string name="group_chat_analysis_exclamation">Excited</string>
+    <string name="group_chat_analysis_speechless">Speechless</string>
+    <string name="group_chat_analysis_length">Message length</string>
+    <string name="group_chat_analysis_content_preference">Content preference</string>
+    <string name="group_chat_analysis_today">Today</string>
+    <string name="group_chat_analysis_week">Last 7 days</string>
+    <string name="group_chat_analysis_month">Last 30 days</string>
+    <string name="group_chat_analysis_year">Last year</string>
+    <string name="group_chat_analysis_all">All available</string>
+</resources>

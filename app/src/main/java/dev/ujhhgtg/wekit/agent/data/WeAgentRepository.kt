@@ -652,6 +652,9 @@ object WeAgentRepository : ToolPermissionSource {
 
     suspend fun getModel(modelId: String): ModelEntity? = db.modelDao().getById(modelId)
 
+    /** One-shot model list for feature dialogs that cannot collect the settings Flow. */
+    suspend fun getAllModels(): List<ModelEntity> = db.modelDao().getAllOnce()
+
     /** The bound system prompt's content for a session, or null. */
     suspend fun getSystemPromptContent(systemPromptId: String?): String? =
         systemPromptId?.let { db.systemPromptDao().getById(it)?.content }
