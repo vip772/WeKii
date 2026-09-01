@@ -28,7 +28,6 @@ import dev.ujhhgtg.wekit.agent.model.*
 import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
-import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
@@ -80,8 +79,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var samplingExpanded by remember { mutableStateOf(false) }
             var sampleLimit by remember { mutableStateOf(5000) }
             var contextCapacity by remember { mutableStateOf("自动") }
-            var activityPeriod by remember { mutableStateOf(7) }
-            var inactiveOpen by remember { mutableStateOf(false) }
             var activityPeriod by remember { mutableStateOf(7) }
             var inactiveOpen by remember { mutableStateOf(false) }
 
@@ -163,7 +160,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
-    @Composable @Composable
+    @Composable
     private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.group_chat_analysis_sampling_settings), fontWeight = FontWeight.Bold)
@@ -175,7 +172,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable
-    @Composable
     private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
         val active = remember(stats) { stats.ranking.map { it.first }.toSet() }
@@ -188,29 +184,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             TextButton(onClick = onInactive) { Text(stringResource(R.string.group_chat_analysis_view_inactive, inactive.size)) }
             if (inactiveOpen) inactive.forEach { member -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(member.nickname, Modifier.weight(1f)); TextButton(onClick = { WeGroupApi.delMember(talker, member.wxId) }) { Text(stringResource(R.string.group_chat_analysis_remove)) } } }
         } }
-    }
-
-    @Composable
-    @Composable
-    private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
-        val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
-        val active = remember(stats) { stats.ranking.map { it.first }.toSet() }
-        val inactive = members.filter { it.nickname !in active && it.displayName !in active }
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.group_chat_analysis_activity_detection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.group_chat_analysis_detection_period), fontWeight = FontWeight.SemiBold)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(7, 14, 30, 0).forEach { d -> FilterChip(period == d, { onPeriod(d) }, { Text(if (d == 0) stringResource(R.string.group_chat_analysis_all) else "最近${d}天") }) } }
-            Text(stringResource(R.string.group_chat_analysis_active_people, stats.activeUsers, members.size))
-            TextButton(onClick = onInactive) { Text(stringResource(R.string.group_chat_analysis_view_inactive, inactive.size)) }
-            if (inactiveOpen) inactive.forEach { member -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(member.nickname, Modifier.weight(1f)); TextButton(onClick = { WeGroupApi.delMember(talker, member.wxId) }) { Text(stringResource(R.string.group_chat_analysis_remove)) } } }
-        } }
-    }
-
-    @Composable
-    private fun CoreMetrics(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.group_chat_analysis_core_metrics), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        MetricRow(stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString(), stringResource(R.string.group_chat_analysis_history_total), s.historyTotalMessages.toString())
-        MetricRow(stringResource(R.string.group_chat_analysis_text_messages), s.textMessages.toString(), stringResource(R.string.group_chat_analysis_at_me), s.atMeMessages.toString())
     }
 
     @Composable private fun DeepCharts(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
