@@ -249,7 +249,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         val period = data.period
         val count = data.count
         val colors = listOf(ComposeColor(0xFF6D36C9), ComposeColor(0xFFFFA000), ComposeColor(0xFF00BCD4), ComposeColor(0xFFE91E63))
-        val color = colors[index]
+        val color = when (data.title) {
+            "熬夜修仙" -> colors[0]
+            "早起鸟儿" -> colors[1]
+            "带薪摸鱼" -> colors[2]
+            else -> colors[3]
+        }
         Card(modifier.height(160.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f))) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
