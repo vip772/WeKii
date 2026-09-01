@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -84,6 +85,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var contextCapacity by remember { mutableStateOf("自动") }
             var activityPeriod by remember { mutableStateOf(7) }
             var inactiveOpen by remember { mutableStateOf(false) }
+            val accent = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
 
             suspend fun reloadModels() {
                 models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModelsOnce() }
@@ -99,10 +101,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.group_chat_analysis_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text("2026/07/31 ~ 2026/09/01", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                            Text("分析报告", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                            Text("2026/08/31 ~ 2026/09/01", color = accent, style = MaterialTheme.typography.titleMedium)
                         }
-                        IconButton(onClick = { samplingExpanded = !samplingExpanded }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_sampling_settings)) }
+                        IconButton(onClick = { samplingExpanded = !samplingExpanded }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent) }
                     }
                     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -116,7 +118,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             stringResource(R.string.group_chat_analysis_history_total), it.historyTotalMessages.toString(),
                         )
                     }
-                    stats?.let { ActivityDetection(message.talker, it, activityPeriod, { activityPeriod = it }, inactiveOpen, { inactiveOpen = !inactiveOpen }) }
                     ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Text(stringResource(R.string.group_chat_analysis_smart_summary), fontWeight = FontWeight.SemiBold)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -162,7 +163,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     stats?.let { DeepCharts(it) }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
-                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(8.dp)) { Text(stringResource(R.string.dialog_close)) }
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(8.dp)) { Text(stringResource(R.string.dialog_close), color = accent) }
                 }
             }
 
@@ -204,7 +205,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     @Composable private fun DeepCharts(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString()) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) { s.ranking.take(10).forEachIndexed { i, v -> Text("${i + 1}. ${v.first}: ${v.second}") } }
         ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { MetricRow(stringResource(R.string.group_chat_analysis_early_bird), s.earlyBird.toString(), stringResource(R.string.group_chat_analysis_night_owl), s.nightOwl.toString()) }
         ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { Text("${stringResource(R.string.group_chat_analysis_laugh)} ${s.laugh} · ${stringResource(R.string.group_chat_analysis_question)} ${s.question} · ${stringResource(R.string.group_chat_analysis_exclamation)} ${s.exclamation} · ${stringResource(R.string.group_chat_analysis_speechless)} ${s.speechless}") }
@@ -212,6 +213,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { Text(s.typeStats.entries.sortedByDescending { it.value }.joinToString(" · ") { "${it.key}: ${it.value}" }) }
     }
 
+    @Composable private fun ActivityDetectionContent(s: GroupAnalysisStats) {
+        MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString())
+        Text(stringResource(R.string.group_chat_analysis_active_people, s.activeUsers, s.ranking.size))
+    }
     @Composable private fun ExpandableSection(title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column {
@@ -294,7 +299,7 @@ private object GroupChatAnalysisEngine {
         val sql = buildString {
             append("SELECT content,createTime,type,isSend FROM message WHERE talker=?")
             if (start > 0) append(" AND createTime>=?")
-            append(" ORDER BY createTime DESC LIMIT 5000")
+            append(" ORDER BY createTime DESC")
         }
         val args = if (start > 0) arrayOf<Any>(talker, start) else arrayOf<Any>(talker)
         WeDatabaseApi.rawQuery(sql, args).use { cursor ->
