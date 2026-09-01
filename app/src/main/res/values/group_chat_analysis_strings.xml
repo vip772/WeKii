@@ -52,4 +52,8 @@
     <string name="group_chat_analysis_word_cloud_count">Word cloud extraction count</string>
     <string name="group_chat_analysis_sampling_note">When the selected period exceeds the limit, messages are sampled uniformly.</string>
     <string name="group_chat_analysis_api_address">API address</string>
+    <string name="group_chat_analysis_detection_period">Detection period</string>
+    <string name="group_chat_analysis_active_people">Active speakers: %1$d; total members: %2$d</string>
+    <string name="group_chat_analysis_view_inactive">View inactive members (%1$d)</string>
+    <string name="group_chat_analysis_remove">Remove</string>
 </resources>

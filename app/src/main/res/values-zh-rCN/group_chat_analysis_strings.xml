@@ -51,4 +51,8 @@
     <string name="group_chat_analysis_analysis_depth">分析深度</string>
     <string name="group_chat_analysis_word_cloud_count">词云提取数</string>
     <string name="group_chat_analysis_sampling_note">设置为0时根据模型容量自动计算；超出上限时进行全局均匀抽样。</string>
+    <string name="group_chat_analysis_detection_period">检测周期</string>
+    <string name="group_chat_analysis_active_people">活跃发言人数：%1$d 人；当前群聊总人数：%2$d 人</string>
+    <string name="group_chat_analysis_view_inactive">查看/清理未发言成员（%1$d人）</string>
+    <string name="group_chat_analysis_remove">移除</string>
 </resources>

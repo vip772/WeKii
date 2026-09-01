@@ -51,4 +51,8 @@
     <string name="group_chat_analysis_analysis_depth">分析深度</string>
     <string name="group_chat_analysis_word_cloud_count">詞雲擷取數</string>
     <string name="group_chat_analysis_sampling_note">超出上限時會進行全域均勻取樣。</string>
+    <string name="group_chat_analysis_detection_period">檢測週期</string>
+    <string name="group_chat_analysis_active_people">活躍發言人數：%1$d 人；目前群聊總人數：%2$d 人</string>
+    <string name="group_chat_analysis_view_inactive">查看/清理未發言成員（%1$d人）</string>
+    <string name="group_chat_analysis_remove">移除</string>
 </resources>
