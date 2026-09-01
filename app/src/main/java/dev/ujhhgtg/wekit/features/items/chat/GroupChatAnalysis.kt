@@ -3,46 +3,29 @@ package dev.ujhhgtg.wekit.features.items.chat
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.View
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
+import com.composables.icons.materialsymbols.outlined.Refresh
+import com.composables.icons.materialsymbols.outlined.Settings
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
-import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
-import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
-import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
-import dev.ujhhgtg.wekit.agent.model.LlmMessage
-import dev.ujhhgtg.wekit.agent.model.LlmRole
-import dev.ujhhgtg.wekit.agent.model.LlmStreamEvent
-import dev.ujhhgtg.wekit.agent.model.ModelProviderManager
+import dev.ujhhgtg.wekit.agent.data.entity.*
+import dev.ujhhgtg.wekit.agent.model.*
+import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
@@ -57,9 +40,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
     override val technicalId = "群聊分析"
@@ -67,32 +48,20 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     override val categoryIds = listOf(FeatureCategoryIds.CHAT)
     override val descriptionRes = R.string.feature_group_chat_analysis_description
     override val defaultEnabled = false
-
     private const val MENU_ID = 777032
     private var selectedModelId by prefOption("group_chat_analysis_model_id", "")
     private val blankIcon = ColorDrawable(Color.TRANSPARENT)
 
     override fun onEnable() = WeChatMessageContextMenuApi.addProvider(this)
     override fun onDisable() = WeChatMessageContextMenuApi.removeProvider(this)
+    override fun getMenuItems() = listOf(WeChatMessageContextMenuApi.MenuItem(
+        id = MENU_ID, text = localizedChatString(R.string.group_chat_analysis_menu), drawable = blankIcon,
+        imageVector = MaterialSymbols.Outlined.Info,
+        isSupported = { it.talker.endsWith("@chatroom") || it.talker.endsWith("@im.chatroom") },
+        multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
+    ) { view, context, message -> showAnalysisDialog(view, context, message) })
 
-    override fun getMenuItems() = listOf(
-        WeChatMessageContextMenuApi.MenuItem(
-            id = MENU_ID,
-            text = localizedChatString(R.string.group_chat_analysis_menu),
-            drawable = blankIcon,
-            imageVector = MaterialSymbols.Outlined.Info,
-            isSupported = { it.talker.endsWith("@chatroom") || it.talker.endsWith("@im.chatroom") },
-            multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
-        ) { view, chattingContext, message ->
-            showAnalysisDialog(view, chattingContext, message)
-        },
-    )
-
-    private fun showAnalysisDialog(
-        @Suppress("UNUSED_PARAMETER") anchor: View,
-        chattingContext: WeChatMessageContextMenuApi.ChattingContext,
-        message: MessageInfo,
-    ) {
+    private fun showAnalysisDialog(@Suppress("UNUSED_PARAMETER") anchor: View, chattingContext: WeChatMessageContextMenuApi.ChattingContext, message: MessageInfo) {
         showComposeDialog(chattingContext.activity) {
             val scope = rememberCoroutineScope()
             var range by remember { mutableStateOf(AnalysisRange.MONTH) }
@@ -100,165 +69,135 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var model by remember { mutableStateOf<ModelEntity?>(null) }
             var stats by remember { mutableStateOf<GroupAnalysisStats?>(null) }
             var report by remember { mutableStateOf("") }
-            var extraRequirement by remember { mutableStateOf("") }
+            var extra by remember { mutableStateOf("") }
             var busy by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
+            var insightExpanded by remember { mutableStateOf(true) }
+            var settingsOpen by remember { mutableStateOf(false) }
+            var settingsSeed by remember { mutableStateOf<ApiDraft?>(null) }
 
-            androidx.compose.runtime.LaunchedEffect(Unit) {
+            suspend fun reloadModels() {
                 models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModelsOnce() }
                 model = models.firstOrNull { it.id == selectedModelId } ?: models.firstOrNull()
+            }
+            LaunchedEffect(Unit) { reloadModels() }
+            LaunchedEffect(range) {
+                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }
+                    .onSuccess { stats = it }.onFailure { error = it.message }
             }
 
             AlertDialogContent(
                 title = { Text(stringResource(R.string.group_chat_analysis_title)) },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 620.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        PickerButton(
-                            text = stringResource(range.labelRes),
-                            options = AnalysisRange.entries,
-                            optionText = { stringResource(it.labelRes) },
-                            onSelect = { range = it },
-                        )
-                        PickerButton(
-                            text = model?.displayName ?: stringResource(R.string.group_chat_analysis_no_model),
-                            options = models,
-                            optionText = { it.displayName },
-                            onSelect = {
-                                model = it
-                                selectedModelId = it.id
-                            },
-                        )
-                        OutlinedTextField(
-                            value = extraRequirement,
-                            onValueChange = { extraRequirement = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            minLines = 1,
-                            maxLines = 4,
-                            label = { Text(stringResource(R.string.group_chat_analysis_extra_requirement)) },
-                        )
-                        Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !busy,
-                            onClick = {
-                                busy = true
-                                error = null
-                                report = ""
-                                scope.launch {
-                                    runCatching {
-                                        val loaded = withContext(Dispatchers.IO) {
-                                            GroupChatAnalysisEngine.load(message.talker, range)
-                                        }
-                                        stats = loaded.stats
-                                        model?.let { selected ->
-                                            GroupChatAnalysisEngine.streamReport(
-                                                selected,
-                                                loaded.messages,
-                                                extraRequirement,
-                                            ) { delta -> report += delta }
-                                        }
-                                    }.onFailure { error = it.message ?: it.javaClass.simpleName }
-                                    busy = false
+                text = { Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    stats?.let { CoreMetrics(it) }
+                    ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
+                        Text(stringResource(R.string.group_chat_analysis_smart_summary), fontWeight = FontWeight.SemiBold)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                            IconButton(onClick = { scope.launch { busy = true; runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }.onSuccess { stats = it }.onFailure { error = it.message }; busy = false } }) {
+                                Icon(MaterialSymbols.Outlined.Refresh, stringResource(R.string.group_chat_analysis_refresh))
+                            }
+                            IconButton(onClick = { scope.launch {
+                                val selected = model
+                                settingsSeed = if (selected == null) ApiDraft() else withContext(Dispatchers.IO) {
+                                    val provider = WeAgentRepository.getModelProvider(selected.providerId)
+                                    ApiDraft(provider?.id.orEmpty(), provider?.baseUrl.orEmpty(), provider?.apiKey.orEmpty(), selected.modelIdRemote)
                                 }
-                            },
-                        ) {
-                            if (busy) CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp).padding(end = 4.dp),
-                                strokeWidth = 2.dp,
-                            )
-                            Text(stringResource(R.string.group_chat_analysis_generate))
+                                settingsOpen = true
+                            } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings)) }
                         }
-                        stats?.let { StatsContent(it) }
-                        if (report.isNotBlank()) {
-                            HorizontalDivider()
-                            Text(stringResource(R.string.group_chat_analysis_ai_report), style = MaterialTheme.typography.titleMedium)
-                            Text(report)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AnalysisRange.entries.forEach { item -> FilterChip(range == item, { range = item }, { Text(stringResource(item.labelRes)) }) }
                         }
-                        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
+                        Button(Modifier.fillMaxWidth(), enabled = !busy && model != null, onClick = {
+                            busy = true; error = null; report = ""
+                            scope.launch { runCatching {
+                                val loaded = withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) }
+                                stats = loaded.stats
+                                GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
+                            }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
+                        }) {
+                            if (busy) CircularProgressIndicator(Modifier.size(18.dp).padding(end = 4.dp), strokeWidth = 2.dp)
+                            Text(stringResource(R.string.group_chat_analysis_generate_summary))
+                        }
+                        if (report.isBlank() && !busy) Text(stringResource(R.string.group_chat_analysis_summary_hint), style = MaterialTheme.typography.bodySmall)
+                        if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(stringResource(R.string.group_chat_analysis_ai_report), fontWeight = FontWeight.SemiBold); Text(report)
+                            }
+                        }
                     }
-                },
+                    stats?.let { DeepCharts(it) }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                } },
                 confirmButton = { DialogButton(onDismiss) { Text(stringResource(R.string.dialog_close)) } },
             )
+
+            if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
+                val providerId = draft.providerId.ifBlank { "group-analysis-${UUID.randomUUID()}" }
+                val provider = ModelProviderEntity(providerId, ModelProviderType.OPENAI_CHAT_COMPLETION, "群聊分析 API", normalizeApiBase(draft.baseUrl, draft.apiPath), draft.apiKey)
+                val row = ModelEntity("$providerId:${draft.modelName}", providerId, draft.modelName, null, null, draft.modelName)
+                withContext(Dispatchers.IO) { WeAgentRepository.upsertModelProvider(provider); WeAgentRepository.upsertModel(row) }
+                selectedModelId = row.id; reloadModels(); settingsOpen = false
+            } }
         }
     }
 
-    @Composable
-    private fun <T> PickerButton(
-        text: String,
-        options: List<T>,
-        optionText: @Composable (T) -> String,
-        onSelect: (T) -> Unit,
-    ) {
-        var expanded by remember { mutableStateOf(false) }
-        Column {
-            Button(modifier = Modifier.fillMaxWidth(), onClick = { expanded = true }) { Text(text) }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(optionText(option)) },
-                        onClick = { expanded = false; onSelect(option) },
-                    )
-                }
+    @Composable private fun CoreMetrics(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.group_chat_analysis_core_metrics), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString())
+        MetricRow(stringResource(R.string.group_chat_analysis_text_messages), s.textMessages.toString(), stringResource(R.string.group_chat_analysis_at_me), s.atMeMessages.toString())
+    }
+
+    @Composable private fun DeepCharts(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString()) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) { s.ranking.take(10).forEachIndexed { i, v -> Text("${i + 1}. ${v.first}: ${v.second}") } }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { MetricRow(stringResource(R.string.group_chat_analysis_early_bird), s.earlyBird.toString(), stringResource(R.string.group_chat_analysis_night_owl), s.nightOwl.toString()) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { Text("${stringResource(R.string.group_chat_analysis_laugh)} ${s.laugh} · ${stringResource(R.string.group_chat_analysis_question)} ${s.question} · ${stringResource(R.string.group_chat_analysis_exclamation)} ${s.exclamation} · ${stringResource(R.string.group_chat_analysis_speechless)} ${s.speechless}") }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_length)) { Text("1–5: ${s.tiny} · 6–20: ${s.short} · 21–50: ${s.medium} · 50+: ${s.long}") }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { Text(s.typeStats.entries.sortedByDescending { it.value }.joinToString(" · ") { "${it.key}: ${it.value}" }) }
+    }
+
+    @Composable private fun ExpandableSection(title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
+        var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column {
+            Row(Modifier.fillMaxWidth().clickable { onControlledToggle?.invoke() ?: run { local = !local } }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Text(if (expanded) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium)
             }
-        }
+            if (expanded) { HorizontalDivider(); Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() } }
+        } }
     }
 
-    @Composable
-    private fun StatsContent(stats: GroupAnalysisStats) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.group_chat_analysis_core_metrics), style = MaterialTheme.typography.titleMedium)
-            MetricRow(
-                stringResource(R.string.group_chat_analysis_total_messages), stats.totalMessages.toString(),
-                stringResource(R.string.group_chat_analysis_active_users), stats.activeUsers.toString(),
-            )
-            MetricRow(
-                stringResource(R.string.group_chat_analysis_text_messages), stats.textMessages.toString(),
-                stringResource(R.string.group_chat_analysis_at_me), stats.atMeMessages.toString(),
-            )
-            Text(stringResource(R.string.group_chat_analysis_active_ranking), style = MaterialTheme.typography.titleMedium)
-            stats.ranking.take(10).forEachIndexed { index, item -> Text("${index + 1}. ${item.first}: ${item.second}") }
-            Text(stringResource(R.string.group_chat_analysis_routine), style = MaterialTheme.typography.titleMedium)
-            MetricRow(
-                stringResource(R.string.group_chat_analysis_early_bird), stats.earlyBird.toString(),
-                stringResource(R.string.group_chat_analysis_night_owl), stats.nightOwl.toString(),
-            )
-            Text(stringResource(R.string.group_chat_analysis_emotion), style = MaterialTheme.typography.titleMedium)
-            Text("${stringResource(R.string.group_chat_analysis_laugh)} ${stats.laugh} · ${stringResource(R.string.group_chat_analysis_question)} ${stats.question} · ${stringResource(R.string.group_chat_analysis_exclamation)} ${stats.exclamation} · ${stringResource(R.string.group_chat_analysis_speechless)} ${stats.speechless}")
-            Text(stringResource(R.string.group_chat_analysis_length), style = MaterialTheme.typography.titleMedium)
-            Text("1–5: ${stats.tiny} · 6–20: ${stats.short} · 21–50: ${stats.medium} · 50+: ${stats.long}")
-            Text(stringResource(R.string.group_chat_analysis_content_preference), style = MaterialTheme.typography.titleMedium)
-            Text(stats.typeStats.entries.sortedByDescending { it.value }.joinToString(" · ") { "${it.key}: ${it.value}" })
-        }
+    @Composable private fun ApiSettingsDialog(seed: ApiDraft, onDismiss: () -> Unit, onSave: (ApiDraft) -> Unit) {
+        var base by remember(seed) { mutableStateOf(seed.baseUrl) }; var path by remember(seed) { mutableStateOf(seed.apiPath) }
+        var key by remember(seed) { mutableStateOf(seed.apiKey) }; var name by remember(seed) { mutableStateOf(seed.modelName.ifBlank { "auto" }) }
+        AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.group_chat_analysis_api_settings)) },
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(base, { base = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.group_chat_analysis_api_address)) }, singleLine = true)
+                OutlinedTextField(path, { path = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.group_chat_analysis_api_path)) }, singleLine = true)
+                OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.group_chat_analysis_api_key)) }, singleLine = true)
+                OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.group_chat_analysis_model_name)) }, singleLine = true)
+            } },
+            confirmButton = { TextButton(enabled = base.isNotBlank() && name.isNotBlank(), onClick = { onSave(seed.copy(baseUrl = base, apiPath = path, apiKey = key, modelName = name)) }) { Text(stringResource(R.string.group_chat_analysis_save)) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.group_chat_analysis_cancel)) } })
     }
 
-    @Composable
-    private fun MetricRow(firstLabel: String, firstValue: String, secondLabel: String, secondValue: String) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetricCard(firstLabel, firstValue, Modifier.weight(1f))
-            MetricCard(secondLabel, secondValue, Modifier.weight(1f))
-        }
-    }
-
-    @Composable
-    private fun MetricCard(label: String, value: String, modifier: Modifier) {
-        Card(modifier) {
-            Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, style = MaterialTheme.typography.titleLarge)
-                Text(label, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
+    private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
+    @Composable private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
+    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
 }
+
+private data class ApiDraft(val providerId: String = "", val baseUrl: String = "https://api.openai.com/v1", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "auto")
 
 private enum class AnalysisRange(val labelRes: Int, val days: Int) {
     TODAY(R.string.group_chat_analysis_today, 1),
+    YESTERDAY(R.string.group_chat_analysis_yesterday, 2),
     WEEK(R.string.group_chat_analysis_week, 7),
+    LAST_WEEK(R.string.group_chat_analysis_last_week, 14),
     MONTH(R.string.group_chat_analysis_month, 30),
+    LAST_MONTH(R.string.group_chat_analysis_last_month, 60),
     YEAR(R.string.group_chat_analysis_year, 365),
     ALL(R.string.group_chat_analysis_all, 0),
 }

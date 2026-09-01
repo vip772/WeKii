@@ -28,4 +28,23 @@
     <string name="group_chat_analysis_month">Last 30 days</string>
     <string name="group_chat_analysis_year">Last year</string>
     <string name="group_chat_analysis_all">All available</string>
+    <string name="group_chat_analysis_smart_insight">Smart insights</string>
+    <string name="group_chat_analysis_smart_summary">Smart message summary</string>
+    <string name="group_chat_analysis_select_period">Select summary period</string>
+    <string name="group_chat_analysis_refresh">Refresh data</string>
+    <string name="group_chat_analysis_api_settings">API configuration</string>
+    <string name="group_chat_analysis_extra_requirement_hint">Optional: What should AI focus on?</string>
+    <string name="group_chat_analysis_generate_summary">Start generating</string>
+    <string name="group_chat_analysis_summary_hint">Tap the button above to generate a live streaming AI report</string>
+    <string name="group_chat_analysis_deep_charts">Detailed charts</string>
+    <string name="group_chat_analysis_activity_detection">Group activity</string>
+    <string name="group_chat_analysis_api_address">API address</string>
+    <string name="group_chat_analysis_api_path">API path</string>
+    <string name="group_chat_analysis_api_key">API Key (Bearer Token)</string>
+    <string name="group_chat_analysis_model_name">Model name</string>
+    <string name="group_chat_analysis_cancel">Cancel</string>
+    <string name="group_chat_analysis_save">Save</string>
+    <string name="group_chat_analysis_yesterday">Yesterday</string>
+    <string name="group_chat_analysis_last_week">Last week</string>
+    <string name="group_chat_analysis_last_month">Last month</string>
 </resources>

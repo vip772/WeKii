@@ -28,4 +28,23 @@
     <string name="group_chat_analysis_month">最近 30 天</string>
     <string name="group_chat_analysis_year">最近一年</string>
     <string name="group_chat_analysis_all">全部記錄</string>
+    <string name="group_chat_analysis_smart_insight">智能洞察</string>
+    <string name="group_chat_analysis_smart_summary">智能總結訊息</string>
+    <string name="group_chat_analysis_select_period">選擇總結時段</string>
+    <string name="group_chat_analysis_refresh">重新整理資料</string>
+    <string name="group_chat_analysis_api_settings">API介面設定</string>
+    <string name="group_chat_analysis_extra_requirement_hint">（選填）讓 AI 重點關注什麼？</string>
+    <string name="group_chat_analysis_generate_summary">開始產生</string>
+    <string name="group_chat_analysis_summary_hint">點擊上方按鈕，讓 AI 即時串流產生報告</string>
+    <string name="group_chat_analysis_deep_charts">深度圖表</string>
+    <string name="group_chat_analysis_activity_detection">群聊活躍檢測</string>
+    <string name="group_chat_analysis_api_address">API 位址</string>
+    <string name="group_chat_analysis_api_path">API 路徑</string>
+    <string name="group_chat_analysis_api_key">API Key（Bearer Token）</string>
+    <string name="group_chat_analysis_model_name">模型名稱</string>
+    <string name="group_chat_analysis_cancel">取消</string>
+    <string name="group_chat_analysis_save">儲存</string>
+    <string name="group_chat_analysis_yesterday">昨日</string>
+    <string name="group_chat_analysis_last_week">上週</string>
+    <string name="group_chat_analysis_last_month">上月</string>
 </resources>
