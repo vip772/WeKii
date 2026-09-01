@@ -136,7 +136,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { it ->
                         MetricTripleRow(
-                            stringResource(R.string.group_chat_analysis_active_users), it.todayActiveUsers.toString(),
+                            "今日发言人数", it.todayActiveUsers.toString(),
                             "今日消息数", it.todayMessages.toString(),
                             "历史总消息", it.historyTotalMessages.toString(),
                         )
@@ -497,9 +497,13 @@ private data class GroupAnalysisStats(
 
 private object GroupChatAnalysisEngine {
     suspend fun load(talker: String, range: AnalysisRange): LoadedAnalysis {
+        val now = Calendar.getInstance()
+        val todayStart = (now.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
         val start = if (range.days == 0) 0L else System.currentTimeMillis() - range.days * 86_400_000L
         val rows = ArrayList<AnalysisMessage>()
         val ranking = linkedMapOf<String, Int>()
+        val todayRanking = linkedMapOf<String, Int>()
+        var todayMessages = 0
         val typeStats = linkedMapOf<String, Int>()
         var total = 0
         var text = 0
@@ -533,6 +537,7 @@ private object GroupChatAnalysisEngine {
                 val isSend = cursor.getInt(sendIndex) != 0
                 val sender = if (isSend) localizedSenderMe() else raw.substringBefore(":\n", raw.substringBefore(':', localizedSenderOther()))
                 ranking[sender] = (ranking[sender] ?: 0) + 1
+                if (createTime >= todayStart) { todayMessages++; todayRanking[sender] = (todayRanking[sender] ?: 0) + 1 }
                 val typeName = messageTypeName(type)
                 typeStats[typeName] = (typeStats[typeName] ?: 0) + 1
                 val hour = Calendar.getInstance().apply { timeInMillis = createTime }.get(Calendar.HOUR_OF_DAY)
@@ -557,9 +562,7 @@ private object GroupChatAnalysisEngine {
             }
         }
         val stats = GroupAnalysisStats(
-            total, total, text, ranking.size, atMe,
-            if (range == AnalysisRange.TODAY) total else 0,
-            if (range == AnalysisRange.TODAY) ranking.size else 0,
+            total, total, text, todayMessages, todayRanking.size, atMe,
             ranking.entries.sortedByDescending { it.value }.map { it.key to it.value },
             earlyBird, nightOwl, laugh, question, exclamation, speechless,
             tiny, short, medium, long, typeStats,
