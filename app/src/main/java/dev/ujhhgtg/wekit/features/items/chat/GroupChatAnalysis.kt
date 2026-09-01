@@ -30,7 +30,7 @@ import com.composables.icons.materialsymbols.outlined.Local_cafe
 import com.composables.icons.materialsymbols.outlined.Bedtime
 import com.composables.icons.materialsymbols.outlined.Favorite
 import com.composables.icons.materialsymbols.outlined.Warning
-import com.composables.icons.materialsymbols.outlined.Help_outline
+import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.More_vert
 import com.composables.icons.materialsymbols.outlined.Remove
 import com.composables.icons.materialsymbols.outlined.Chat
@@ -38,7 +38,7 @@ import com.composables.icons.materialsymbols.outlined.Record_voice_over
 import com.composables.icons.materialsymbols.outlined.Notes
 import com.composables.icons.materialsymbols.outlined.Photo_library
 import com.composables.icons.materialsymbols.outlined.Format_quote
-import com.composables.icons.materialsymbols.outlined.Emoji_emotions
+import com.composables.icons.materialsymbols.outlined.Favorite
 import com.composables.icons.materialsymbols.outlined.Mic
 import com.composables.icons.materialsymbols.outlined.Gif_box
 import com.composables.icons.materialsymbols.outlined.Videocam
@@ -314,6 +314,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun accentColor() = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
 
     @Composable
@@ -322,7 +323,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         val items = listOf(
             Emotion("快乐浓度", s.laugh, MaterialSymbols.Outlined.Favorite, ComposeColor(0xFFFFB800)),
             Emotion("激动暴躁", s.exclamation, MaterialSymbols.Outlined.Warning, ComposeColor(0xFFFF4038)),
-            Emotion("疑惑指数", s.question, MaterialSymbols.Outlined.Help_outline, ComposeColor(0xFF2196F3)),
+            Emotion("疑惑指数", s.question, MaterialSymbols.Outlined.Info, ComposeColor(0xFF2196F3)),
             Emotion("荡漾撒娇", 0, MaterialSymbols.Outlined.Favorite, ComposeColor(0xFFE91E63)),
             Emotion("无语凝噎", s.speechless, MaterialSymbols.Outlined.More_vert, ComposeColor(0xFFAAAAAA)),
         )
@@ -388,11 +389,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             "文本" -> MaterialSymbols.Outlined.Notes
             "图片" -> MaterialSymbols.Outlined.Photo_library
             "引用回复" -> MaterialSymbols.Outlined.Format_quote
-            "表情包" -> MaterialSymbols.Outlined.Emoji_emotions
+            "表情包" -> MaterialSymbols.Outlined.Favorite
             "语音" -> MaterialSymbols.Outlined.Mic
             "GIF动画" -> MaterialSymbols.Outlined.Gif_box
             "视频" -> MaterialSymbols.Outlined.Videocam
-            else -> MaterialSymbols.Outlined.Help_outline
+            else -> MaterialSymbols.Outlined.Info
         }) }
         val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
