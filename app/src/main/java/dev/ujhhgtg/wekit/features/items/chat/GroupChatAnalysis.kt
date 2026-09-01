@@ -69,7 +69,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     override val defaultEnabled = false
 
     private const val MENU_ID = 777032
-    private const val SAMPLE_LIMIT = 5000
     private var selectedModelId by prefOption("group_chat_analysis_model_id", "")
     private val blankIcon = ColorDrawable(Color.TRANSPARENT)
 
@@ -307,7 +306,7 @@ private object GroupChatAnalysisEngine {
         val sql = buildString {
             append("SELECT content,createTime,type,isSend FROM message WHERE talker=?")
             if (start > 0) append(" AND createTime>=?")
-            append(" ORDER BY createTime DESC LIMIT $SAMPLE_LIMIT")
+            append(" ORDER BY createTime DESC LIMIT 5000")
         }
         val args = if (start > 0) arrayOf<Any>(talker, start) else arrayOf<Any>(talker)
         WeDatabaseApi.rawQuery(sql, args).use { cursor ->
