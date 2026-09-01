@@ -441,11 +441,25 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
-    @Composable private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)); MetricCard(c, cv, Modifier.weight(1f))
+    @Composable
+    private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 30.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                MetricCard(a, av, Modifier.weight(1f))
+                MetricCard(b, bv, Modifier.weight(1f))
+                MetricCard(c, cv, Modifier.weight(1f))
+            }
+        }
     }
-    @Composable private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
-    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface)) { Column(Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
+    @Composable
+    private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
+    @Composable
+    private fun MetricCard(label: String, value: String, modifier: Modifier) {
+        Column(modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
+        }
+    }
 }
 
 private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
