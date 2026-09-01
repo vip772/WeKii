@@ -113,8 +113,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { it ->
-                        MetricRow(
-                            stringResource(R.string.group_chat_analysis_active_users), it.activeUsers.toString(),
+                        MetricTripleRow(
+                            stringResource(R.string.group_chat_analysis_active_users), it.todayActiveUsers.toString(),
+                            stringResource(R.string.group_chat_analysis_total_messages), it.todayMessages.toString(),
                             stringResource(R.string.group_chat_analysis_history_total), it.historyTotalMessages.toString(),
                         )
                     }
@@ -134,8 +135,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                 settingsOpen = true
                             } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings)) }
                         }
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AnalysisRange.entries.forEach { item -> FilterChip(range == item, { range = item }, { Text(stringResource(item.labelRes)) }) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            AnalysisRange.entries.forEach { item -> TextButton(onClick = { range = item }, modifier = Modifier.weight(1f)) { Text(stringResource(item.labelRes), color = if (range == item) accent else MaterialTheme.colorScheme.onSurface) } }
                         }
                         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
                         Button(
@@ -242,6 +243,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
+    @Composable private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)); MetricCard(c, cv, Modifier.weight(1f))
+    }
     @Composable private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
     @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
 }
@@ -260,6 +264,8 @@ private data class LoadedAnalysis(val stats: GroupAnalysisStats, val messages: L
 private data class GroupAnalysisStats(
     val totalMessages: Int,
     val historyTotalMessages: Int,
+    val todayMessages: Int,
+    val todayActiveUsers: Int,
     val textMessages: Int,
     val activeUsers: Int,
     val atMeMessages: Int,
@@ -340,6 +346,8 @@ private object GroupChatAnalysisEngine {
         }
         val stats = GroupAnalysisStats(
             total, total, text, ranking.size, atMe,
+            if (range == AnalysisRange.TODAY) total else 0,
+            if (range == AnalysisRange.TODAY) ranking.size else 0,
             ranking.entries.sortedByDescending { it.value }.map { it.key to it.value },
             earlyBird, nightOwl, laugh, question, exclamation, speechless,
             tiny, short, medium, long, typeStats,
