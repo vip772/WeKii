@@ -157,9 +157,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                 settingsOpen = true
                             } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings)) }
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            AnalysisRange.entries.forEach { item -> TextButton(onClick = { range = item }, modifier = Modifier.weight(1f)) { Text(stringResource(item.labelRes), color = if (range == item) accent else MaterialTheme.colorScheme.onSurface) } }
-                        }
+                        AnalysisPeriodSelector(AnalysisRange.entries.toList(), range, { selected -> range = selected; report = "" }, accent)
                         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
                         Button(
                             onClick = {
@@ -289,11 +287,13 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable
-    private fun AnalysisPeriodSelector(options: List<AnalysisRange>, range: AnalysisRange, onRangeChange: (AnalysisRange) -> Unit) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            options.forEach { item ->
-                TextButton(onClick = { onRangeChange(item) }, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(item.labelRes), color = if (range == item) accentColor() else MaterialTheme.colorScheme.onSurface)
+    private fun AnalysisPeriodSelector(options: List<AnalysisRange>, range: AnalysisRange, onRangeChange: (AnalysisRange) -> Unit, selectedColor: ComposeColor) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                options.forEach { item ->
+                    TextButton(onClick = { onRangeChange(item) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 10.dp)) {
+                        Text(stringResource(item.labelRes), color = if (range == item) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)
+                    }
                 }
             }
         }
