@@ -3,6 +3,7 @@ package dev.ujhhgtg.wekit.features.items.chat
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.View
+import android.view.WindowManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toDrawable
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.Refresh
@@ -33,8 +35,6 @@ import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
-import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
-import dev.ujhhgtg.wekit.ui.content.Button as DialogButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -64,6 +64,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     private fun showAnalysisDialog(@Suppress("UNUSED_PARAMETER") anchor: View, chattingContext: WeChatMessageContextMenuApi.ChattingContext, message: MessageInfo) {
         showComposeDialog(chattingContext.activity) {
+            LaunchedEffect(Unit) {
+                window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            }
             val scope = rememberCoroutineScope()
             var range by remember { mutableStateOf(AnalysisRange.MONTH) }
             var models by remember { mutableStateOf(emptyList<ModelEntity>()) }
@@ -92,9 +95,16 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     .onSuccess { stats = it }.onFailure { error = it.message }
             }
 
-            AlertDialogContent(
-                title = { Text(stringResource(R.string.group_chat_analysis_title)) },
-                text = { Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(0.dp)) {
+                Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.group_chat_analysis_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                            Text("2026/07/31 ~ 2026/09/01", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                        }
+                        IconButton(onClick = { samplingExpanded = !samplingExpanded }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_sampling_settings)) }
+                    }
+                    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.group_chat_analysis_title), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         TextButton(onClick = { samplingExpanded = !samplingExpanded }) { Text(stringResource(R.string.group_chat_analysis_sampling_settings)) }
@@ -151,9 +161,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     stats?.let { DeepCharts(it) }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                } },
-                confirmButton = { DialogButton(onDismiss) { Text(stringResource(R.string.dialog_close)) } },
-            )
+                    }
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(8.dp)) { Text(stringResource(R.string.dialog_close)) }
+                }
+            }
 
             if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
                 val providerId = draft.providerId.ifBlank { "group-analysis-${UUID.randomUUID()}" }
