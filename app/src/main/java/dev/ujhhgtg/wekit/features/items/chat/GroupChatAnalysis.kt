@@ -106,7 +106,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var error by remember { mutableStateOf<String?>(null) }
 
             androidx.compose.runtime.LaunchedEffect(Unit) {
-                models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModels() }
+                models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModelsOnce() }
                 model = models.firstOrNull { it.id == selectedModelId } ?: models.firstOrNull()
             }
 
