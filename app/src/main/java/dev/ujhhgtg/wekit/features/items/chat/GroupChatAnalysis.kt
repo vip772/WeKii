@@ -562,8 +562,14 @@ private object GroupChatAnalysisEngine {
             }
         }
         val stats = GroupAnalysisStats(
-            total, total, text, todayMessages, todayRanking.size, atMe,
-            ranking.entries.sortedByDescending { it.value }.map { it.key to it.value },
+            totalMessages = total,
+            historyTotalMessages = total,
+            todayMessages = todayMessages,
+            todayActiveUsers = todayRanking.size,
+            textMessages = text,
+            activeUsers = ranking.size,
+            atMeMessages = atMe,
+            ranking = ranking.entries.sortedByDescending { it.value }.map { it.key to it.value },
             earlyBird, nightOwl, laugh, question, exclamation, speechless,
             tiny, short, medium, long, typeStats,
         )
