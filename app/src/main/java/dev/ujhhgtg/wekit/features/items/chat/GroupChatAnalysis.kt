@@ -75,6 +75,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var insightExpanded by remember { mutableStateOf(true) }
             var settingsOpen by remember { mutableStateOf(false) }
             var settingsSeed by remember { mutableStateOf<ApiDraft?>(null) }
+            var samplingExpanded by remember { mutableStateOf(false) }
+            var sampleLimit by remember { mutableStateOf(5000) }
+            var contextCapacity by remember { mutableStateOf("自动") }
 
             suspend fun reloadModels() {
                 models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModelsOnce() }
@@ -89,6 +92,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             AlertDialogContent(
                 title = { Text(stringResource(R.string.group_chat_analysis_title)) },
                 text = { Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.group_chat_analysis_title), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { samplingExpanded = !samplingExpanded }) { Text(stringResource(R.string.group_chat_analysis_sampling_settings)) }
+                    }
+                    if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { CoreMetrics(it) }
                     ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Text(stringResource(R.string.group_chat_analysis_smart_summary), fontWeight = FontWeight.SemiBold)
@@ -101,7 +109,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                 val selected = model
                                 settingsSeed = if (selected == null) ApiDraft() else withContext(Dispatchers.IO) {
                                     val provider = WeAgentRepository.getModelProvider(selected.providerId)
-                                    ApiDraft(provider?.id.orEmpty(), provider?.baseUrl.orEmpty(), provider?.apiKey.orEmpty(), selected.modelIdRemote)
+                                    ApiDraft(provider?.id.orEmpty(), provider?.baseUrl.orEmpty(), "/chat/completions", provider?.apiKey.orEmpty(), selected.modelIdRemote)
                                 }
                                 settingsOpen = true
                             } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings)) }
@@ -148,7 +156,19 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
-    @Composable private fun CoreMetrics(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    @Composable @Composable
+    private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.group_chat_analysis_sampling_settings), fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.group_chat_analysis_analysis_depth))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(500, 1000, 2000, 5000).forEach { n -> FilterChip(limit == n, { onLimit(n) }, { Text("${n}条") }) } }
+            Text(stringResource(R.string.group_chat_analysis_word_cloud_count))
+            Text(stringResource(R.string.group_chat_analysis_sampling_note), style = MaterialTheme.typography.bodySmall)
+        } }
+    }
+
+    @Composable
+    private fun CoreMetrics(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_core_metrics), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString())
         MetricRow(stringResource(R.string.group_chat_analysis_text_messages), s.textMessages.toString(), stringResource(R.string.group_chat_analysis_at_me), s.atMeMessages.toString())
@@ -193,16 +213,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
 }
 
-private data class ApiDraft(val providerId: String = "", val baseUrl: String = "https://api.openai.com/v1", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "auto")
+private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
 
 private enum class AnalysisRange(val labelRes: Int, val days: Int) {
-    TODAY(R.string.group_chat_analysis_today, 1),
-    YESTERDAY(R.string.group_chat_analysis_yesterday, 2),
-    WEEK(R.string.group_chat_analysis_week, 7),
-    LAST_WEEK(R.string.group_chat_analysis_last_week, 14),
-    MONTH(R.string.group_chat_analysis_month, 30),
-    LAST_MONTH(R.string.group_chat_analysis_last_month, 60),
-    YEAR(R.string.group_chat_analysis_year, 365),
+    TODAY(R.string.group_chat_analysis_today, 1), YESTERDAY(R.string.group_chat_analysis_yesterday, 2),
+    WEEK(R.string.group_chat_analysis_week, 7), LAST_WEEK(R.string.group_chat_analysis_last_week, 14),
+    MONTH(R.string.group_chat_analysis_month, 30), LAST_MONTH(R.string.group_chat_analysis_last_month, 60),
     ALL(R.string.group_chat_analysis_all, 0),
 }
 

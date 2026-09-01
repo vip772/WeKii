@@ -47,4 +47,9 @@
     <string name="group_chat_analysis_yesterday">Yesterday</string>
     <string name="group_chat_analysis_last_week">Last week</string>
     <string name="group_chat_analysis_last_month">Last month</string>
+    <string name="group_chat_analysis_sampling_settings">Sampling settings</string>
+    <string name="group_chat_analysis_analysis_depth">Analysis depth</string>
+    <string name="group_chat_analysis_word_cloud_count">Word cloud extraction count</string>
+    <string name="group_chat_analysis_sampling_note">When the selected period exceeds the limit, messages are sampled uniformly.</string>
+    <string name="group_chat_analysis_api_address">API address</string>
 </resources>
