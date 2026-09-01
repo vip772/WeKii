@@ -229,7 +229,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
-            AnalysisPeriodSelector(AnalysisRange.entries.filter { it != AnalysisRange.ALL }, range = AnalysisRange.TODAY, onRangeChange = {})
+            AnalysisPeriodSelector(AnalysisRange.entries.filter { it != AnalysisRange.ALL }, range = AnalysisRange.TODAY, onRangeChange = {}, selectedColor = accentColor())
             val maxCount = s.ranking.maxOfOrNull { it.second } ?: 1
             s.ranking.take(10).forEachIndexed { i, v ->
                 RankingItem(i + 1, v.first, v.second, maxCount)
