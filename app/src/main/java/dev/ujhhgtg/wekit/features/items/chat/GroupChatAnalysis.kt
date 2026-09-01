@@ -110,14 +110,18 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             AnalysisRange.entries.forEach { item -> FilterChip(range == item, { range = item }, { Text(stringResource(item.labelRes)) }) }
                         }
                         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
-                        Button(Modifier.fillMaxWidth(), enabled = !busy && model != null, onClick = {
-                            busy = true; error = null; report = ""
-                            scope.launch { runCatching {
-                                val loaded = withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) }
-                                stats = loaded.stats
-                                GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
-                            }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
-                        }) {
+                        Button(
+                            onClick = {
+                                busy = true; error = null; report = ""
+                                scope.launch { runCatching {
+                                    val loaded = withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) }
+                                    stats = loaded.stats
+                                    GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
+                                }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !busy && model != null,
+                        ) {
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp).padding(end = 4.dp), strokeWidth = 2.dp)
                             Text(stringResource(R.string.group_chat_analysis_generate_summary))
                         }
