@@ -187,6 +187,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.group_chat_analysis_sampling_settings), fontWeight = FontWeight.Bold)
@@ -197,6 +198,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         } }
     }
 
+    @Composable
     private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
         val active = remember(stats) { stats.ranking.map { it.first }.toSet() }
@@ -227,6 +229,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(s) }
     }
 
+    @Composable
     private fun RoutineChart(s: GroupAnalysisStats) {
         val cards = listOf(
             RoutineData("熬夜修仙", "00:00 – 04:00", s.nightOwl, MaterialSymbols.Outlined.Nights_stay),
@@ -244,6 +247,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     private data class RoutineData(val title: String, val period: String, val count: Int, val icon: ImageVector)
+    @Composable
     private fun RoutineCard(data: RoutineData, modifier: Modifier) {
         val title = data.title
         val period = data.period
@@ -270,6 +274,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun AnalysisPeriodSelector(options: List<AnalysisRange>, range: AnalysisRange, onRangeChange: (AnalysisRange) -> Unit) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             options.forEach { item ->
@@ -280,6 +285,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun RankingItem(rank: Int, name: String, count: Int, maxCount: Int) {
         val progress = (count.toFloat() / maxCount.coerceAtLeast(1)).coerceIn(0f, 1f)
         Column(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -296,6 +302,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     private fun accentColor() = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
 
+    @Composable
     private fun EmotionFingerprint(s: GroupAnalysisStats) {
         data class Emotion(val title: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
         val items = listOf(
@@ -327,6 +334,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun MessageLengthChart(s: GroupAnalysisStats) {
         data class LengthItem(val title: String, val range: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
         val items = listOf(
@@ -358,6 +366,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
+    @Composable
     private fun ContentPreferenceChart(s: GroupAnalysisStats) {
         data class ContentItem(val name: String, val value: Int, val icon: ImageVector)
         val labels = listOf("文本", "图片", "引用回复", "表情包", "语音", "GIF动画", "其他未知", "视频")
