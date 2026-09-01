@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +24,10 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.Refresh
 import com.composables.icons.materialsymbols.outlined.Settings
+import com.composables.icons.materialsymbols.outlined.Nights_stay
+import com.composables.icons.materialsymbols.outlined.Wb_sunny
+import com.composables.icons.materialsymbols.outlined.Local_cafe
+import com.composables.icons.materialsymbols.outlined.Bedtime
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
 import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
@@ -85,7 +90,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var contextCapacity by remember { mutableStateOf("自动") }
             var activityPeriod by remember { mutableStateOf(7) }
             var inactiveOpen by remember { mutableStateOf(false) }
-            val accent = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
+            val darkTheme = MaterialTheme.colorScheme.background.red < 0.2f
+            val accent = if (darkTheme) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
+            val accentContainer = if (darkTheme) ComposeColor(0xFF5D3A00) else ComposeColor(0xFFFFD9E2)
+            val onAccentContainer = if (darkTheme) ComposeColor(0xFFFFDDB5) else ComposeColor(0xFF3E0016)
 
             suspend fun reloadModels() {
                 models = withContext(Dispatchers.IO) { WeAgentRepository.getAllModelsOnce() }
@@ -97,6 +105,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     .onSuccess { stats = it }.onFailure { error = it.message }
             }
 
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(0.dp)) {
                 Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -109,7 +118,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("核心指标", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        TextButton(onClick = { samplingExpanded = !samplingExpanded }) { Text(stringResource(R.string.group_chat_analysis_sampling_settings)) }
                     }
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { it ->
@@ -155,7 +163,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             Text(stringResource(R.string.group_chat_analysis_generate_summary))
                         }
                         if (report.isBlank() && !busy) Text(stringResource(R.string.group_chat_analysis_summary_hint), style = MaterialTheme.typography.bodySmall)
-                        if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = accentContainer, contentColor = onAccentContainer)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(stringResource(R.string.group_chat_analysis_ai_report), fontWeight = FontWeight.SemiBold); Text(report)
                             }
@@ -166,6 +174,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(8.dp)) { Text(stringResource(R.string.dialog_close), color = accent) }
                 }
+            }
             }
 
             if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
@@ -178,7 +187,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
-    @Composable
     private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.group_chat_analysis_sampling_settings), fontWeight = FontWeight.Bold)
@@ -189,7 +197,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         } }
     }
 
-    @Composable
     private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
         val active = remember(stats) { stats.ranking.map { it.first }.toSet() }
@@ -207,11 +214,173 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     @Composable private fun DeepCharts(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) { s.ranking.take(10).forEachIndexed { i, v -> Text("${i + 1}. ${v.first}: ${v.second}") } }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { MetricRow(stringResource(R.string.group_chat_analysis_early_bird), s.earlyBird.toString(), stringResource(R.string.group_chat_analysis_night_owl), s.nightOwl.toString()) }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { Text("${stringResource(R.string.group_chat_analysis_laugh)} ${s.laugh} · ${stringResource(R.string.group_chat_analysis_question)} ${s.question} · ${stringResource(R.string.group_chat_analysis_exclamation)} ${s.exclamation} · ${stringResource(R.string.group_chat_analysis_speechless)} ${s.speechless}") }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_length)) { Text("1–5: ${s.tiny} · 6–20: ${s.short} · 21–50: ${s.medium} · 50+: ${s.long}") }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { Text(s.typeStats.entries.sortedByDescending { it.value }.joinToString(" · ") { "${it.key}: ${it.value}" }) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
+            AnalysisPeriodSelector(AnalysisRange.entries.filter { it != AnalysisRange.ALL }, range = AnalysisRange.TODAY, onRangeChange = {})
+            val maxCount = s.ranking.maxOfOrNull { it.second } ?: 1
+            s.ranking.take(10).forEachIndexed { i, v ->
+                RankingItem(i + 1, v.first, v.second, maxCount)
+            }
+        }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_length)) { MessageLengthChart(s) }
+        ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(s) }
+    }
+
+    private fun RoutineChart(s: GroupAnalysisStats) {
+        val cards = listOf(
+            RoutineData("熬夜修仙", "00:00 – 04:00", s.nightOwl, MaterialSymbols.Outlined.Nights_stay),
+            RoutineData("早起鸟儿", "05:00 – 08:00", s.earlyBird, MaterialSymbols.Outlined.Wb_sunny),
+            RoutineData("带薪摸鱼", "工作划水期", (s.totalMessages - s.nightOwl - s.earlyBird).coerceAtLeast(0), MaterialSymbols.Outlined.Local_cafe),
+            RoutineData("夜生活", "19:00 – 23:00", s.nightOwl, MaterialSymbols.Outlined.Bedtime),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            cards.chunked(2).forEach { rowCards ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    rowCards.forEach { card -> RoutineCard(card, Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+
+    private data class RoutineData(val title: String, val period: String, val count: Int, val icon: ImageVector)
+    private fun RoutineCard(data: RoutineData, modifier: Modifier) {
+        val title = data.title
+        val period = data.period
+        val count = data.count
+        val colors = listOf(ComposeColor(0xFF6D36C9), ComposeColor(0xFFFFA000), ComposeColor(0xFF00BCD4), ComposeColor(0xFFE91E63))
+        val color = colors[index]
+        Card(modifier.height(160.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f))) {
+            Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(data.icon, contentDescription = title, tint = color, modifier = Modifier.size(42.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(title, color = color, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(period, color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Text("$count 条", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+
+    private fun AnalysisPeriodSelector(options: List<AnalysisRange>, range: AnalysisRange, onRangeChange: (AnalysisRange) -> Unit) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            options.forEach { item ->
+                TextButton(onClick = { onRangeChange(item) }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(item.labelRes), color = if (range == item) accentColor() else MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+    }
+
+    private fun RankingItem(rank: Int, name: String, count: Int, maxCount: Int) {
+        val progress = (count.toFloat() / maxCount.coerceAtLeast(1)).coerceIn(0f, 1f)
+        Column(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                    Text(rank.toString(), fontWeight = FontWeight.Bold)
+                }
+                Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text("$count 条", color = accentColor(), fontWeight = FontWeight.Bold)
+            }
+            LinearProgressIndicator(progress = { progress }, Modifier.fillMaxWidth().padding(start = 36.dp), color = accentColor(), trackColor = MaterialTheme.colorScheme.surfaceVariant)
+        }
+    }
+
+    private fun accentColor() = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFF9800) else ComposeColor(0xFFE91E63)
+
+    private fun EmotionFingerprint(s: GroupAnalysisStats) {
+        data class Emotion(val title: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
+        val items = listOf(
+            Emotion("快乐浓度", s.laugh, MaterialSymbols.Outlined.Sentiment_satisfied, ComposeColor(0xFFFFB800)),
+            Emotion("激动暴躁", s.exclamation, MaterialSymbols.Outlined.Priority_high, ComposeColor(0xFFFF4038)),
+            Emotion("疑惑指数", s.question, MaterialSymbols.Outlined.Question_mark, ComposeColor(0xFF2196F3)),
+            Emotion("荡漾撒娇", 0, MaterialSymbols.Outlined.Waves, ComposeColor(0xFFE91E63)),
+            Emotion("无语凝噎", s.speechless, MaterialSymbols.Outlined.More_horiz, ComposeColor(0xFFAAAAAA)),
+        )
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                items.forEach { item ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(42.dp))
+                            }
+                            Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        }
+                        LinearProgressIndicator(
+                            progress = { (item.value / maxOf(21f, items.maxOf { it.value }.toFloat())).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = item.color,
+                            trackColor = item.color.copy(alpha = 0.12f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun MessageLengthChart(s: GroupAnalysisStats) {
+        data class LengthItem(val title: String, val range: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
+        val items = listOf(
+            LengthItem("情字如金", "1–5字", s.tiny, MaterialSymbols.Outlined.Horizontal_rule, ComposeColor(0xFF4CAF50)),
+            LengthItem("正常交流", "6–20字", s.short, MaterialSymbols.Outlined.Chat_bubble_outline, ComposeColor(0xFF2196F3)),
+            LengthItem("侃侃而谈", "20–50字", s.medium, MaterialSymbols.Outlined.Record_voice_over, ComposeColor(0xFFFF9800)),
+            LengthItem("长篇大论", "50字+", s.long, MaterialSymbols.Outlined.Article, ComposeColor(0xFF9C27B0)),
+        )
+        val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                items.forEach { item ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(42.dp))
+                            }
+                            Text("${item.title} (${item.range})", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        }
+                        LinearProgressIndicator(
+                            progress = { item.value.toFloat() / maxValue },
+                            modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = item.color,
+                            trackColor = item.color.copy(alpha = 0.12f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun ContentPreferenceChart(s: GroupAnalysisStats) {
+        data class ContentItem(val name: String, val value: Int, val icon: ImageVector)
+        val labels = listOf("文本", "图片", "引用回复", "表情包", "语音", "GIF动画", "其他未知", "视频")
+        val items = labels.map { ContentItem(it, s.typeStats[it] ?: 0, when (it) {
+            "文本" -> MaterialSymbols.Outlined.Text_fields
+            "图片" -> MaterialSymbols.Outlined.Image
+            "引用回复" -> MaterialSymbols.Outlined.Format_quote
+            "表情包" -> MaterialSymbols.Outlined.Emoji_emotions
+            "语音" -> MaterialSymbols.Outlined.Mic
+            "GIF动画" -> MaterialSymbols.Outlined.Gif_box
+            "视频" -> MaterialSymbols.Outlined.Videocam
+            else -> MaterialSymbols.Outlined.Help_outline
+        }) }
+        val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                items.forEach { item ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) { Icon(item.icon, item.name, tint = accentColor(), modifier = Modifier.size(42.dp)) }
+                            Text(item.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = accentColor(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        }
+                        LinearProgressIndicator(progress = { item.value.toFloat() / maxValue }, modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = accentColor(), trackColor = accentColor().copy(alpha = 0.12f))
+                    }
+                }
+            }
+        }
     }
 
     @Composable private fun ActivityDetectionContent(s: GroupAnalysisStats) {
@@ -247,7 +416,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)); MetricCard(c, cv, Modifier.weight(1f))
     }
     @Composable private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
-    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
+    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
 }
 
 private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
