@@ -306,11 +306,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     private fun EmotionFingerprint(s: GroupAnalysisStats) {
         data class Emotion(val title: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
         val items = listOf(
-            Emotion("快乐浓度", s.laugh, MaterialSymbols.Outlined.Sentiment_satisfied, ComposeColor(0xFFFFB800)),
-            Emotion("激动暴躁", s.exclamation, MaterialSymbols.Outlined.Priority_high, ComposeColor(0xFFFF4038)),
-            Emotion("疑惑指数", s.question, MaterialSymbols.Outlined.Question_mark, ComposeColor(0xFF2196F3)),
-            Emotion("荡漾撒娇", 0, MaterialSymbols.Outlined.Waves, ComposeColor(0xFFE91E63)),
-            Emotion("无语凝噎", s.speechless, MaterialSymbols.Outlined.More_horiz, ComposeColor(0xFFAAAAAA)),
+            Emotion("快乐浓度", s.laugh, MaterialSymbols.Outlined.Favorite, ComposeColor(0xFFFFB800)),
+            Emotion("激动暴躁", s.exclamation, MaterialSymbols.Outlined.Warning, ComposeColor(0xFFFF4038)),
+            Emotion("疑惑指数", s.question, MaterialSymbols.Outlined.Help_outline, ComposeColor(0xFF2196F3)),
+            Emotion("荡漾撒娇", 0, MaterialSymbols.Outlined.Favorite, ComposeColor(0xFFE91E63)),
+            Emotion("无语凝噎", s.speechless, MaterialSymbols.Outlined.More_vert, ComposeColor(0xFFAAAAAA)),
         )
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -338,10 +338,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     private fun MessageLengthChart(s: GroupAnalysisStats) {
         data class LengthItem(val title: String, val range: String, val value: Int, val icon: ImageVector, val color: ComposeColor)
         val items = listOf(
-            LengthItem("情字如金", "1–5字", s.tiny, MaterialSymbols.Outlined.Horizontal_rule, ComposeColor(0xFF4CAF50)),
-            LengthItem("正常交流", "6–20字", s.short, MaterialSymbols.Outlined.Chat_bubble_outline, ComposeColor(0xFF2196F3)),
+            LengthItem("情字如金", "1–5字", s.tiny, MaterialSymbols.Outlined.Remove, ComposeColor(0xFF4CAF50)),
+            LengthItem("正常交流", "6–20字", s.short, MaterialSymbols.Outlined.Chat, ComposeColor(0xFF2196F3)),
             LengthItem("侃侃而谈", "20–50字", s.medium, MaterialSymbols.Outlined.Record_voice_over, ComposeColor(0xFFFF9800)),
-            LengthItem("长篇大论", "50字+", s.long, MaterialSymbols.Outlined.Article, ComposeColor(0xFF9C27B0)),
+            LengthItem("长篇大论", "50字+", s.long, MaterialSymbols.Outlined.Notes, ComposeColor(0xFF9C27B0)),
         )
         val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -371,8 +371,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         data class ContentItem(val name: String, val value: Int, val icon: ImageVector)
         val labels = listOf("文本", "图片", "引用回复", "表情包", "语音", "GIF动画", "其他未知", "视频")
         val items = labels.map { ContentItem(it, s.typeStats[it] ?: 0, when (it) {
-            "文本" -> MaterialSymbols.Outlined.Text_fields
-            "图片" -> MaterialSymbols.Outlined.Image
+            "文本" -> MaterialSymbols.Outlined.Notes
+            "图片" -> MaterialSymbols.Outlined.Photo_library
             "引用回复" -> MaterialSymbols.Outlined.Format_quote
             "表情包" -> MaterialSymbols.Outlined.Emoji_emotions
             "语音" -> MaterialSymbols.Outlined.Mic
