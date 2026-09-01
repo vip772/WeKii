@@ -100,7 +100,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         TextButton(onClick = { samplingExpanded = !samplingExpanded }) { Text(stringResource(R.string.group_chat_analysis_sampling_settings)) }
                     }
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
-                    stats?.let { CoreMetrics(it) }
+                    stats?.let { it ->
+                        MetricRow(
+                            stringResource(R.string.group_chat_analysis_active_users), it.activeUsers.toString(),
+                            stringResource(R.string.group_chat_analysis_history_total), it.historyTotalMessages.toString(),
+                        )
+                    }
                     stats?.let { ActivityDetection(message.talker, it, activityPeriod, { activityPeriod = it }, inactiveOpen, { inactiveOpen = !inactiveOpen }) }
                     ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Text(stringResource(R.string.group_chat_analysis_smart_summary), fontWeight = FontWeight.SemiBold)
