@@ -56,4 +56,5 @@
     <string name="group_chat_analysis_active_people">Active speakers: %1$d; total members: %2$d</string>
     <string name="group_chat_analysis_view_inactive">View inactive members (%1$d)</string>
     <string name="group_chat_analysis_remove">Remove</string>
+    <string name="group_chat_analysis_history_total">Historical messages</string>
 </resources>

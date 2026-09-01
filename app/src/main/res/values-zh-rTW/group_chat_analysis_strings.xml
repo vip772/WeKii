@@ -55,4 +55,5 @@
     <string name="group_chat_analysis_active_people">活躍發言人數：%1$d 人；目前群聊總人數：%2$d 人</string>
     <string name="group_chat_analysis_view_inactive">查看/清理未發言成員（%1$d人）</string>
     <string name="group_chat_analysis_remove">移除</string>
+    <string name="group_chat_analysis_history_total">歷史總訊息</string>
 </resources>

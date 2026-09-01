@@ -55,4 +55,5 @@
     <string name="group_chat_analysis_active_people">活跃发言人数：%1$d 人；当前群聊总人数：%2$d 人</string>
     <string name="group_chat_analysis_view_inactive">查看/清理未发言成员（%1$d人）</string>
     <string name="group_chat_analysis_remove">移除</string>
+    <string name="group_chat_analysis_history_total">历史总消息</string>
 </resources>
