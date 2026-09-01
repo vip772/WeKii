@@ -137,8 +137,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     stats?.let { it ->
                         MetricTripleRow(
                             stringResource(R.string.group_chat_analysis_active_users), it.todayActiveUsers.toString(),
-                            stringResource(R.string.group_chat_analysis_total_messages), it.todayMessages.toString(),
-                            stringResource(R.string.group_chat_analysis_history_total), it.historyTotalMessages.toString(),
+                            "今日消息数", it.todayMessages.toString(),
+                            "历史总消息", it.historyTotalMessages.toString(),
                         )
                     }
                     ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
@@ -441,11 +441,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
-    @Composable private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    @Composable private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)); MetricCard(c, cv, Modifier.weight(1f))
     }
     @Composable private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
-    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface)) { Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
+    @Composable private fun MetricCard(label: String, value: String, modifier: Modifier) = Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface)) { Column(Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.bodySmall) } }
 }
 
 private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
