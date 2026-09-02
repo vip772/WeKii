@@ -299,6 +299,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(talker, s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember(talker) { mutableStateOf(s) }
+        var rankingShareOpen by remember { mutableStateOf(false) }
         LaunchedEffect(talker, rankingRange) {
             rankingStats = runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.getOrDefault(s)
         }
@@ -308,8 +309,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
             rankingStats.ranking.take(10).forEachIndexed { i, v ->
                 val member = members.firstOrNull { it.wxId == v.senderId }
-                RankingItem(i + 1, member?.displayName ?: v.senderId, member?.avatarUrl.orEmpty(), v.count, maxCount)
+                RankingItem(i + 1, member?.displayName ?: localizedSenderOther(), member?.avatarUrl.orEmpty(), v.count, maxCount)
             }
+            Button(onClick = { rankingShareOpen = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = accentColor())) {
+                Text("生成截图")
+            }
+            if (rankingShareOpen) RankingShareDialog(talker, rankingStats, members) { rankingShareOpen = false }
         }
         ExpandableSection(MaterialSymbols.Outlined.Schedule, stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
         ExpandableSection(MaterialSymbols.Outlined.Mood, stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
@@ -564,6 +569,53 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             Canvas(Modifier.fillMaxSize()) { val w = 12.dp.toPx(); drawArc(accent.copy(alpha = 0.14f), -90f, 360f, false, style = Stroke(w)); drawArc(accent, -90f, 360f * ratio, false, style = Stroke(w, cap = StrokeCap.Round)) }
             Text(String.format(Locale.getDefault(), "%.0f%%", ratio * 100), color = accent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
+    }
+
+    @Composable
+    private fun RankingShareDialog(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, onDismiss: () -> Unit) {
+        val groups = remember(talker) { runCatching { WeDatabaseApi.getGroups() }.getOrDefault(emptyList()) }
+        var query by remember { mutableStateOf("") }
+        var selected by remember { mutableStateOf(emptySet<String>()) }
+        val visible = groups.filter { query.isBlank() || it.displayName.contains(query, true) }
+            .sortedWith(compareByDescending<dev.ujhhgtg.wekit.features.api.core.models.WeGroup> { it.wxId == talker }.thenBy { it.displayName })
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("发送活跃排行截图") },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                    OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(MaterialSymbols.Outlined.Search, null) }, placeholder = { Text("搜索群聊名称") })
+                    Spacer(Modifier.height(8.dp))
+                    Column(Modifier.fillMaxWidth().heightIn(min = 280.dp).verticalScroll(rememberScrollState())) {
+                        visible.forEach { group ->
+                            Row(Modifier.fillMaxWidth().clickable { selected = if (group.wxId in selected) selected - group.wxId else selected + group.wxId }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(group.wxId in selected, null)
+                                Text(group.displayName, Modifier.weight(1f), maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { val path = createRankingImage(talker, stats, members); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        )
+    }
+
+    private fun createRankingImage(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>): String {
+        val entries = stats.ranking.take(10)
+        val bitmap = Bitmap.createBitmap(900, 180 + entries.size * 55, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(bitmap)
+        canvas.drawColor(Color.rgb(232, 243, 255))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY; textSize = 30f }
+        canvas.drawText("活跃发言排行", 50f, 60f, paint)
+        canvas.drawText(WeDatabaseApi.getGroup(talker)?.displayName ?: "群聊", 50f, 105f, paint)
+        entries.forEachIndexed { index, entry ->
+            val name = members.firstOrNull { it.wxId == entry.senderId }?.displayName ?: localizedSenderOther()
+            canvas.drawText("${index + 1}. $name    ${entry.count}条", 50f, 160f + index * 55f, paint)
+        }
+        val file = File.createTempFile("active-ranking-", ".png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        return file.absolutePath
     }
 
     @Composable private fun InactiveMemberDialog(talker:String,members:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,inactive:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,onDismiss:()->Unit) {
