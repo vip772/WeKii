@@ -603,22 +603,45 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     private fun createRankingImage(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>): String {
         val entries = stats.ranking.take(10)
-        val bitmap = Bitmap.createBitmap(900, 180 + entries.size * 55, Bitmap.Config.ARGB_8888)
+        val width = 1080
+        val rowHeight = 92
+        val top = 150
+        val bottom = 100
+        val bitmap = Bitmap.createBitmap(width, top + entries.size * rowHeight + bottom, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
-        canvas.drawColor(Color.rgb(232, 243, 255))
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY; textSize = 30f }
-        canvas.drawText("活跃发言排行", 50f, 60f, paint)
-        canvas.drawText(WeDatabaseApi.getGroup(talker)?.displayName ?: "群聊", 50f, 105f, paint)
+        canvas.drawColor(Color.WHITE)
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(35, 35, 35); textSize = 42f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(45, 45, 45); textSize = 32f }
+        val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(233, 30, 99); textSize = 30f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(238, 238, 238); strokeWidth = 2f }
+        val groupName = WeDatabaseApi.getGroup(talker)?.displayName?.ifBlank { "群聊" } ?: "群聊"
+        canvas.drawText("$groupName 活跃发言排行", 48f, 78f, titlePaint)
+        canvas.drawLine(48f, 112f, width - 48f, 112f, linePaint)
+        val maxCount = entries.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
         entries.forEachIndexed { index, entry ->
-            val name = members.firstOrNull { it.wxId == entry.senderId }?.displayName ?: "未知成员"
-            canvas.drawText("${index + 1}. $name    ${entry.count}条", 50f, 160f + index * 55f, paint)
+            val y = top + index * rowHeight
+            val member = members.firstOrNull { it.wxId == entry.senderId }
+            val name = member?.displayName?.ifBlank { member.nickname }?.ifBlank { "未知成员" } ?: if (entry.senderId == WeApi.selfWxId) "我" else "未知成员"
+            val rankColor = when (index) { 0 -> Color.rgb(232, 168, 45); 1 -> Color.rgb(130, 145, 160); 2 -> Color.rgb(190, 125, 75); else -> Color.rgb(90, 90, 90) }
+            val rankPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = rankColor; textSize = 34f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+            canvas.drawText("${index + 1}", 62f, y + 45f, rankPaint)
+            canvas.drawText(name, 135f, y + 40f, textPaint)
+            canvas.drawText("${entry.count} 条", width - 180f, y + 40f, countPaint)
+            val barLeft = 135f
+            val barRight = width - 180f
+            val barY = y + 68f
+            linePaint.color = Color.rgb(245, 235, 239)
+            canvas.drawLine(barLeft, barY, barRight, barY, linePaint)
+            linePaint.color = Color.rgb(233, 30, 99)
+            canvas.drawLine(barLeft, barY, barLeft + (barRight - barLeft) * entry.count / maxCount.toFloat(), barY, linePaint)
         }
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.GRAY; textSize = 24f }
+        canvas.drawText("生成时间：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}", 48f, bitmap.height - 35f, footerPaint)
         val file = File.createTempFile("active-ranking-", ".png")
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
         return file.absolutePath
     }
-
     @Composable private fun InactiveMemberDialog(talker:String,members:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,inactive:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,onDismiss:()->Unit) {
         var selected by remember { mutableStateOf(emptySet<String>()) }; var query by remember { mutableStateOf("") }; val ids=inactive.map{it.wxId}.toSet(); val ordered=inactive+members.filterNot{it.wxId in ids}; val visible=ordered.filter{query.isBlank()||it.displayName.contains(query,true)||it.wxId.contains(query,true)}
         AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.heightIn(max=520.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
