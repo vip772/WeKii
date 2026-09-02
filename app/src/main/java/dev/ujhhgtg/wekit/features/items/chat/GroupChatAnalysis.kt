@@ -54,6 +54,7 @@ import com.composables.icons.materialsymbols.outlined.Schedule
 import com.composables.icons.materialsymbols.outlined.Mood
 import com.composables.icons.materialsymbols.outlined.Text_fields
 import com.composables.icons.materialsymbols.outlined.Category
+import com.composables.icons.materialsymbols.outlined.History
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
 import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
@@ -143,19 +144,20 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("核心指标", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("核心指标", Modifier.weight(1f), color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { it ->
                         MetricTripleRow(
-                            "今日发言人数", it.todayActiveUsers.toString(),
-                            "今日消息数", it.todayMessages.toString(),
-                            "历史总消息", it.historyTotalMessages.toString(),
+                            MetricData("今日发言人数", it.todayActiveUsers.toString(), MaterialSymbols.Outlined.Groups),
+                            MetricData("今日消息数", it.todayMessages.toString(), MaterialSymbols.Outlined.Chat),
+                            MetricData("历史总消息", it.historyTotalMessages.toString(), MaterialSymbols.Outlined.History),
                         )
                     }
                     Text(
                         stringResource(R.string.group_chat_analysis_smart_insight),
                         style = MaterialTheme.typography.headlineSmall,
+                        color = accent,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 4.dp),
                     )
@@ -485,26 +487,28 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
     @Composable
-    private fun MetricTripleRow(a: String, av: String, b: String, bv: String, c: String, cv: String) {
+    private fun MetricTripleRow(a: MetricData, b: MetricData, c: MetricData) {
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 30.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                MetricCard(a, av, Modifier.weight(1f))
-                MetricCard(b, bv, Modifier.weight(1f))
-                MetricCard(c, cv, Modifier.weight(1f))
+                MetricCard(a, Modifier.weight(1f))
+                MetricCard(b, Modifier.weight(1f))
+                MetricCard(c, Modifier.weight(1f))
             }
         }
     }
     @Composable
-    private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(a, av, Modifier.weight(1f)); MetricCard(b, bv, Modifier.weight(1f)) }
+    private fun MetricRow(a: String, av: String, b: String, bv: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { MetricCard(MetricData(a, av, MaterialSymbols.Outlined.Info), Modifier.weight(1f)); MetricCard(MetricData(b, bv, MaterialSymbols.Outlined.Info), Modifier.weight(1f)) }
     @Composable
-    private fun MetricCard(label: String, value: String, modifier: Modifier) {
-        Column(modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
+    private fun MetricCard(data: MetricData, modifier: Modifier) {
+        Column(modifier.padding(horizontal = 4.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(data.icon, contentDescription = null, tint = accentColor(), modifier = Modifier.size(28.dp))
+            Text(data.value, color = accentColor(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(data.label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false)
         }
     }
 }
 
+private data class MetricData(val label: String, val value: String, val icon: ImageVector)
 private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
 
 private enum class AnalysisRange(val labelRes: Int, val days: Int) {
