@@ -480,21 +480,43 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     @Composable private fun ActivityDetectionContent(talker: String, s: GroupAnalysisStats) {
         val accent = accentColor()
+        val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
         var period by remember { mutableStateOf(7) }
-        var inactiveOpen by remember { mutableStateOf(false) }
-        Text("检测周期", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        var memberDialog by remember { mutableStateOf(false) }
+        val activeIds = remember(s) { s.ranking.map { it.senderId }.toSet() }
+        val inactive = members.filter { it.wxId !in activeIds && it.nickname !in activeIds && it.displayName !in activeIds }
+        Text("检测周期", color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(7, 14, 30, 0).forEach { d ->
-                FilterChip(selected = period == d, onClick = { period = d }, label = { Text(if (d == 0) "全部" else "最近${d}天") })
+            listOf(7, 14, 30, 0).forEach { d -> FilterChip(period == d, { period = d }, { Text(if (d == 0) "全部" else "最近${d}天") }) }
+        }
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Icon(MaterialSymbols.Outlined.Groups, null, tint = accent, modifier = Modifier.size(32.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("活跃发言人数: ${s.activeUsers} 人", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("当前群聊总人数为 ${members.size} 人", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Text("${if (members.isEmpty()) 0 else (s.activeUsers * 100 / members.size)}%", color = accent, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+                HorizontalDivider()
+                Button(onClick = { memberDialog = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = ComposeColor(0xFFFFE4E1), contentColor = ComposeColor(0xFFB3261E))) {
+                    Icon(MaterialSymbols.Outlined.Person_remove, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("查看/清理未发言成员 (${inactive.size}人)", fontWeight = FontWeight.Bold)
+                }
             }
         }
-        MetricRow("活跃发言人数", s.activeUsers.toString(), "群聊总人数", s.ranking.size.toString())
-        Text("当前群聊总人数为 ${s.ranking.size} 人", style = MaterialTheme.typography.bodyLarge)
-        TextButton(onClick = { inactiveOpen = true }) { Text("查看/清理未发言成员（${(s.ranking.size - s.activeUsers).coerceAtLeast(0)}人）", color = ComposeColor(0xFFB3261E)) }
-        if (inactiveOpen) {
-            val members = remember { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
-            AlertDialog(onDismissRequest = { inactiveOpen = false }, title = { Text("群聊成员") }, text = { Column(Modifier.verticalScroll(rememberScrollState())) { members.sortedBy { it.displayName }.forEach { member -> Text(member.displayName, Modifier.padding(vertical = 8.dp)) } } }, confirmButton = { TextButton(onClick = { inactiveOpen = false }) { Text("关闭") } })
-        }
+        if (memberDialog) InactiveMemberDialog(talker, members, inactive, { memberDialog = false })
+    }
+
+    @Composable private fun InactiveMemberDialog(talker: String, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, inactive: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, onDismiss: () -> Unit) {
+        var selected by remember { mutableStateOf(emptySet<String>()) }
+        val ordered = inactive + members.filterNot { it.wxId in inactive.map { m -> m.wxId }.toSet() }
+        AlertDialog(onDismissRequest = onDismiss, title = { Text("群聊成员") }, text = { Column(Modifier.verticalScroll(rememberScrollState())) { ordered.forEach { member -> Row(Modifier.fillMaxWidth().clickable { selected = if (member.wxId in selected) selected - member.wxId else selected + member.wxId }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Checkbox(member.wxId in selected, null); Text(member.displayName, Modifier.weight(1f)); if (member.wxId in inactive.map { it.wxId }) Text("未发言", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } } } }, confirmButton = { TextButton(enabled = selected.isNotEmpty(), onClick = { WeGroupApi.delMembers(talker, selected.toList()); onDismiss() }) { Text("移除选中成员") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
     }
     @Composable private fun ExpandableSection(icon: ImageVector, title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
