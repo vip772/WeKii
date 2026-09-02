@@ -19,6 +19,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -479,20 +487,76 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
-    @Composable private fun ActivityDetectionContent(talker: String, s: GroupAnalysisStats) {
+    @Composable
+    private fun ActivityDetectionContent(talker: String, s: GroupAnalysisStats) {
         val accent = accentColor()
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
-        var period by remember { mutableStateOf(7) }; var memberDialog by remember { mutableStateOf(false) }; var loaded by remember { mutableStateOf<GroupAnalysisStats?>(null) }
-        LaunchedEffect(talker, period) { loaded = runCatching { GroupChatAnalysisEngine.load(talker, if (period == 0) AnalysisRange.ALL else AnalysisRange.entries.minByOrNull { kotlin.math.abs(it.days - period) } ?: AnalysisRange.WEEK).stats }.getOrNull() }
-        val activeIds = loaded?.ranking?.map { it.senderId }?.toSet() ?: emptySet(); val inactive = members.filter { it.wxId !in activeIds }
-        val percent = if (members.isEmpty()) 0.0 else (loaded?.activeUsers ?: 0).toDouble() * 100 / members.size
-        Text("检测周期", color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(7,14,30,0).forEach { d -> FilterChip(period == d, { period=d }, { Text(if(d==0) "全部" else "最近${d}天") }) } }
-        Card(Modifier.fillMaxWidth(), shape=RoundedCornerShape(22.dp), colors=CardDefaults.cardColors(containerColor=accent.copy(alpha=.08f))) { Column(Modifier.padding(18.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) { Box(Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha=.12f)), contentAlignment=Alignment.Center) { Icon(MaterialSymbols.Outlined.Groups,null,tint=accent,modifier=Modifier.size(32.dp)) }; Spacer(Modifier.width(16.dp)); Column(Modifier.weight(1f)) { Text("活跃发言人数: ${loaded?.activeUsers ?: 0} 人",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold); Text("当前群聊总人数为 ${members.size} 人",style=MaterialTheme.typography.bodyLarge) }; Text(String.format(Locale.getDefault(),"%.1f%%",percent),color=accent,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold) }
-            HorizontalDivider(modifier=Modifier.padding(vertical=4.dp)); val dark=MaterialTheme.colorScheme.background.red<.2f; Button({memberDialog=true},Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp),colors=ButtonDefaults.buttonColors(containerColor=if(dark) ComposeColor(0xFF5A2825) else ComposeColor(0xFFFFE4E1),contentColor=if(dark) ComposeColor(0xFFFFB4AB) else ComposeColor(0xFFB3261E))) { Icon(MaterialSymbols.Outlined.Remove,null); Spacer(Modifier.width(8.dp)); Text("查看/清理未发言成员 (${inactive.size}人)",fontWeight=FontWeight.Bold) }
-        } }; if(memberDialog) InactiveMemberDialog(talker,members,inactive){memberDialog=false}
+        val periods = listOf(7, 14, 30, 0)
+        var period by remember { mutableStateOf(7) }
+        var memberDialog by remember { mutableStateOf(false) }
+        var currentStats by remember { mutableStateOf(s) }
+        LaunchedEffect(talker, period) {
+            currentStats = runCatching {
+                val range = if (period == 0) AnalysisRange.ALL else AnalysisRange.entries.minByOrNull { kotlin.math.abs(it.days - period) } ?: AnalysisRange.WEEK
+                GroupChatAnalysisEngine.load(talker, range).stats
+            }.getOrDefault(s)
+        }
+        val activeIds = currentStats.ranking.map { it.senderId }.toSet()
+        val inactive = members.filter { it.wxId !in activeIds }
+        val ratio = if (members.isEmpty()) 0f else (currentStats.activeUsers.toFloat() / members.size).coerceIn(0f, 1f)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("检测周期", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text(if (period == 0) "全部" else "最近${period}天", color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        ActivityPeriodSlider(period, periods, accent) { period = it }
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.08f))) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { Icon(MaterialSymbols.Outlined.Groups, null, tint = accent, modifier = Modifier.size(32.dp)) }
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("活跃发言人数: ${currentStats.activeUsers} 人", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("当前群聊总人数为 ${members.size} 人", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    ActivityRatio(ratio, accent)
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Button(onClick = { memberDialog = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = ComposeColor(0xFFFFE4E1), contentColor = ComposeColor(0xFFB3261E))) {
+                    Icon(MaterialSymbols.Outlined.Remove, null); Spacer(Modifier.width(8.dp)); Text("查看/清理未发言成员 (${inactive.size}人)", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        if (memberDialog) InactiveMemberDialog(talker, members, inactive) { memberDialog = false }
     }
+
+    @Composable
+    private fun ActivityPeriodSlider(value: Int, periods: List<Int>, accent: ComposeColor, onValue: (Int) -> Unit) {
+        var widthPx by remember { mutableStateOf(1f) }
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(54.dp).onGloballyPositioned { widthPx = it.size.width.toFloat().coerceAtLeast(1f) }.pointerInput(widthPx) {
+                detectDragGestures { change, _ -> change.consume(); val fraction = (change.position.x / widthPx).coerceIn(0f, 1f); onValue(periods[(fraction * periods.lastIndex).roundToInt()]) }
+            }) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val y = size.height / 2f; val left = 12f; val right = size.width - 12f
+                    drawLine(accent.copy(alpha = 0.16f), Offset(left, y), Offset(right, y), 28f, cap = StrokeCap.Round)
+                    repeat(41) { i -> drawCircle(accent, 2.6f, Offset(left + (right - left) * i / 40f, y)) }
+                    val x = left + (right - left) * periods.indexOf(value).coerceAtLeast(0) / periods.lastIndex
+                    drawLine(accent, Offset(x, y - 20f), Offset(x, y + 20f), 12f, cap = StrokeCap.Round)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { periods.forEach { d -> Text(if (d == 0) "全部" else "最近${d}天", color = if (d == value) accent else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.clickable { onValue(d) }) } }
+        }
+    }
+
+    @Composable
+    private fun ActivityRatio(ratio: Float, accent: ComposeColor) {
+        Box(Modifier.size(86.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) { val w = 12.dp.toPx(); drawArc(accent.copy(alpha = 0.14f), -90f, 360f, false, style = Stroke(w)); drawArc(accent, -90f, 360f * ratio, false, style = Stroke(w, cap = StrokeCap.Round)) }
+            Text(String.format(Locale.getDefault(), "%.0f%%", ratio * 100), color = accent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+    }
+
     @Composable private fun InactiveMemberDialog(talker:String,members:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,inactive:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,onDismiss:()->Unit) {
         var selected by remember { mutableStateOf(emptySet<String>()) }; var query by remember { mutableStateOf("") }; val ids=inactive.map{it.wxId}.toSet(); val ordered=inactive+members.filterNot{it.wxId in ids}; val visible=ordered.filter{query.isBlank()||it.displayName.contains(query,true)||it.wxId.contains(query,true)}
         AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.heightIn(max=520.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
