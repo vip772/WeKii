@@ -10,6 +10,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -231,7 +236,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember { mutableStateOf(s) }
@@ -243,7 +248,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
             AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
             val maxCount = rankingStats.ranking.maxOfOrNull { it.second } ?: 1
-            rankingStats.ranking.take(10).forEachIndexed { i, v -> RankingItem(i + 1, v.first, v.second, maxCount) }
+            val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
+            rankingStats.ranking.take(10).forEachIndexed { i, v ->
+                val member = members.firstOrNull { it.nickname == v.first || it.displayName == v.first }
+                RankingItem(i + 1, member?.displayName ?: v.first, member?.avatarUrl.orEmpty(), v.second, maxCount)
+            }
         }
         ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
         ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
@@ -310,13 +319,21 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable
-    private fun RankingItem(rank: Int, name: String, count: Int, maxCount: Int) {
+    private fun RankingItem(rank: Int, name: String, avatarUrl: String, count: Int, maxCount: Int) {
         val progress = (count.toFloat() / maxCount.coerceAtLeast(1)).coerceIn(0f, 1f)
         Column(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                     Text(rank.toString(), fontWeight = FontWeight.Bold)
                 }
+                if (avatarUrl.isNotBlank()) {
+                    AsyncImage(avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(CircleShape))
+                } else {
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                        Text(name.firstOrNull()?.toString().orEmpty(), fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
                 Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 Text("$count 条", color = accentColor(), fontWeight = FontWeight.Bold)
             }
