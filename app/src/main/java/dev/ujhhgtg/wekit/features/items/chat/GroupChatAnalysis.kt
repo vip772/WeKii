@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -21,9 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.core.graphics.drawable.toDrawable
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
@@ -146,11 +150,29 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
                         }
                     }
-                    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
+                            .verticalScroll(rememberScrollState())
+                            .animateContentSize(animationSpec = tween(220))
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures { _, dragAmount ->
+                                    if (kotlin.math.abs(dragAmount) > 10f) {
+                                        if (dragAmount < 0f) samplingExpanded = false else samplingExpanded = true
+                                    }
+                                }
+                            },
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("核心指标", Modifier.weight(1f), color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
-                    if (samplingExpanded) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = samplingExpanded,
+                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+                    ) {
                         SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     }
                     stats?.let { it ->
@@ -215,6 +237,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             }
             }
 
+            if (modelSamplingOpen) AlertDialog(
+                onDismissRequest = { modelSamplingOpen = false },
+                title = { Text("模型容量与采样") },
+                text = { SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it }) },
+                confirmButton = { TextButton(onClick = { modelSamplingOpen = false }) { Text("完成") } },
+            )
             if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
                 val providerId = draft.providerId.ifBlank { "group-analysis-${UUID.randomUUID()}" }
                 val provider = ModelProviderEntity(providerId, ModelProviderType.OPENAI_CHAT_COMPLETION, "群聊分析 API", normalizeApiBase(draft.baseUrl, draft.apiPath), draft.apiKey)
