@@ -76,6 +76,7 @@ import dev.ujhhgtg.wekit.agent.data.entity.*
 import dev.ujhhgtg.wekit.agent.model.*
 import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
+import dev.ujhhgtg.wekit.features.api.core.WeApi
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
@@ -765,10 +766,18 @@ private data class GroupAnalysisStats(
 )
 
 private object GroupChatAnalysisEngine {
+    private val groupSenderRegex = Regex("""^([^\n:]+):\n(.*)$""", setOf(RegexOption.DOT_MATCHES_ALL))
+
     suspend fun load(talker: String, range: AnalysisRange): LoadedAnalysis {
         val now = Calendar.getInstance()
         val todayStart = (now.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-        val start = if (range.days == 0) 0L else System.currentTimeMillis() - range.days * 86_400_000L
+        val start = when {
+            range == AnalysisRange.TODAY -> todayStart
+            range.days == 0 -> 0L
+            else -> System.currentTimeMillis() - range.days * 86_400_000L
+        }
+        val members = runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList())
+        val memberNames = members.associate { it.wxId to (it.displayName.ifBlank { it.nickname }.ifBlank { "未知成员" }) }
         val rows = ArrayList<AnalysisMessage>()
         val ranking = linkedMapOf<String, Int>()
         val todayRanking = linkedMapOf<String, Int>()
@@ -804,9 +813,17 @@ private object GroupChatAnalysisEngine {
                 val createTime = cursor.getLong(timeIndex)
                 val type = cursor.getInt(typeIndex)
                 val isSend = cursor.getInt(sendIndex) != 0
-                val sender = if (isSend) localizedSenderMe() else "未知成员"
-                ranking[sender] = (ranking[sender] ?: 0) + 1
-                if (createTime >= todayStart) { todayMessages++; todayRanking[sender] = (todayRanking[sender] ?: 0) + 1 }
+                val match = if (isSend) null else groupSenderRegex.find(raw)
+                val senderId = if (isSend) WeApi.selfWxId else match?.groupValues?.get(1)?.trim().orEmpty()
+                val contentBody = if (isSend) raw else match?.groupValues?.get(2) ?: raw
+                val senderName = if (isSend) localizedSenderMe() else memberNames[senderId] ?: "未知成员"
+                if (senderId.isNotBlank()) {
+                    ranking[senderId] = (ranking[senderId] ?: 0) + 1
+                    if (createTime >= todayStart) {
+                        todayMessages++
+                        todayRanking[senderId] = (todayRanking[senderId] ?: 0) + 1
+                    }
+                }
                 val typeName = messageTypeName(type)
                 typeStats[typeName] = (typeStats[typeName] ?: 0) + 1
                 val hour = Calendar.getInstance().apply { timeInMillis = createTime }.get(Calendar.HOUR_OF_DAY)
@@ -815,7 +832,7 @@ private object GroupChatAnalysisEngine {
                 if (raw.contains("@") && isSend.not()) atMe++
                 if (type == 1) {
                     text++
-                    val content = raw.substringAfter(":\n", raw)
+                    val content = contentBody
                     if (content.contains("哈") || content.contains("笑")) laugh++
                     if (content.contains('?') || content.contains('？') || content.contains("吗")) question++
                     if (content.contains('!') || content.contains('！')) exclamation++
@@ -826,7 +843,7 @@ private object GroupChatAnalysisEngine {
                         in 21..50 -> medium++
                         else -> long++
                     }
-                    rows += AnalysisMessage(sender, content, createTime)
+                    rows += AnalysisMessage(senderName, content, createTime)
                 }
             }
         }
