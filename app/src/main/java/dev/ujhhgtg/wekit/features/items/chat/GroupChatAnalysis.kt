@@ -189,10 +189,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings), tint = accent) }
                         }
                         AnalysisPeriodSelector(AnalysisRange.entries.toList(), range, { selected -> range = selected; report = "" }, accent)
-                        androidx.compose.animation.AnimatedVisibility(visible = samplingExpanded, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-                            SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
-                        }
-                        OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
+                            OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer),
                             onClick = {
