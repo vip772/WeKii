@@ -245,7 +245,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.group_chat_analysis_deep_charts), color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember { mutableStateOf(s) }
@@ -461,11 +461,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             colors = CardDefaults.outlinedCardColors(),
         ) { Column {
             Row(Modifier.fillMaxWidth().clickable { onControlledToggle?.invoke() ?: run { local = !local } }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Box(Modifier.size(40.dp).clip(CircleShape).background(accentColor().copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = accentColor(), modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Text(if (expanded) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium)
+                Text(title, Modifier.weight(1f), color = accentColor(), fontWeight = FontWeight.SemiBold); Text(if (expanded) "⌃" else "⌄", color = accentColor(), style = MaterialTheme.typography.titleMedium)
             }
             if (expanded) { HorizontalDivider(); Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() } }
         } }
