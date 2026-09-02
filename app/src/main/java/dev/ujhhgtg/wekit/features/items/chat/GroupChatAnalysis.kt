@@ -181,7 +181,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             }
                         }
                     }
-                    stats?.let { DeepCharts(it) }
+                    stats?.let { DeepCharts(message.talker, it) }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                     TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(8.dp)) { Text(stringResource(R.string.dialog_close), color = accent) }
@@ -225,15 +225,20 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         } }
     }
 
-    @Composable private fun DeepCharts(s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
+        var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
+        var rankingStats by remember { mutableStateOf(s) }
+        LaunchedEffect(rankingRange) {
+            if (rankingRange != AnalysisRange.TODAY) {
+                runCatching { GroupChatAnalysisEngine.load(currentTalkerForAnalysis, rankingRange).stats }.onSuccess { rankingStats = it }
+            } else rankingStats = s
+        }
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
-            AnalysisPeriodSelector(AnalysisRange.entries.filter { it != AnalysisRange.ALL }, range = AnalysisRange.TODAY, onRangeChange = {}, selectedColor = accentColor())
-            val maxCount = s.ranking.maxOfOrNull { it.second } ?: 1
-            s.ranking.take(10).forEachIndexed { i, v ->
-                RankingItem(i + 1, v.first, v.second, maxCount)
-            }
+            AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
+            val maxCount = rankingStats.ranking.maxOfOrNull { it.second } ?: 1
+            rankingStats.ranking.take(10).forEachIndexed { i, v -> RankingItem(i + 1, v.first, v.second, maxCount) }
         }
         ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
         ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
