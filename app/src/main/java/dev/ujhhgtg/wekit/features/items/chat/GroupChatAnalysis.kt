@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -22,12 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.core.graphics.drawable.toDrawable
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
@@ -144,7 +140,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("分析报告", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text("2026/08/31 ~ 2026/09/01", color = accent, style = MaterialTheme.typography.titleMedium)
+                            Text(analysisDateRange(range), color = accent, style = MaterialTheme.typography.titleMedium)
                         }
                         IconButton(onClick = { samplingExpanded = !samplingExpanded }) {
                             Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
@@ -154,33 +150,18 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         Modifier
                             .fillMaxSize()
                             .padding(horizontal = 24.dp)
-                            .verticalScroll(rememberScrollState())
-                            .animateContentSize(animationSpec = tween(220))
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures { _, dragAmount ->
-                                    if (kotlin.math.abs(dragAmount) > 10f) {
-                                        if (dragAmount < 0f) samplingExpanded = false else samplingExpanded = true
-                                    }
-                                }
-                            },
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("核心指标", Modifier.weight(1f), color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = samplingExpanded,
-                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-                    ) {
-                        SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
-                    }
                     stats?.let { it ->
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("核心指标", color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         MetricTripleRow(
                             MetricData("今日发言人数", it.todayActiveUsers.toString(), MaterialSymbols.Outlined.Groups),
                             MetricData("今日消息数", it.todayMessages.toString(), MaterialSymbols.Outlined.Chat),
                             MetricData("历史总消息", it.historyTotalMessages.toString(), MaterialSymbols.Outlined.History),
                         )
+                        }
                     }
                     Text(
                         stringResource(R.string.group_chat_analysis_smart_insight),
@@ -205,6 +186,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings), tint = accent) }
                         }
                         AnalysisPeriodSelector(AnalysisRange.entries.toList(), range, { selected -> range = selected; report = "" }, accent)
+                        androidx.compose.animation.AnimatedVisibility(visible = samplingExpanded, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+                            SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
+                        }
                         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer),
@@ -548,6 +532,14 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
 private data class MetricData(val label: String, val value: String, val icon: ImageVector)
 private data class ApiDraft(val providerId: String = "", val baseUrl: String = "", val apiPath: String = "/chat/completions", val apiKey: String = "", val modelName: String = "")
+
+private fun analysisDateRange(range: AnalysisRange): String {
+    val end = Calendar.getInstance()
+    val start = end.clone() as Calendar
+    if (range.days > 0) start.add(Calendar.DAY_OF_YEAR, -(range.days - 1))
+    val format = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+    return if (range.days == 0) "全部记录" else "${format.format(start.time)} ~ ${format.format(end.time)}"
+}
 
 private enum class AnalysisRange(val labelRes: Int, val days: Int) {
     TODAY(R.string.group_chat_analysis_today, 1), YESTERDAY(R.string.group_chat_analysis_yesterday, 2),
