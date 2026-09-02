@@ -299,10 +299,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(talker, s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember(talker) { mutableStateOf(s) }
-        LaunchedEffect(rankingRange) {
-            if (rankingRange != AnalysisRange.TODAY) {
-                runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.onSuccess { rankingStats = it }
-            } else rankingStats = s
+        LaunchedEffect(talker, rankingRange) {
+            rankingStats = runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.getOrDefault(s)
         }
         ExpandableSection(MaterialSymbols.Outlined.Bar_chart, stringResource(R.string.group_chat_analysis_active_ranking)) {
             AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
