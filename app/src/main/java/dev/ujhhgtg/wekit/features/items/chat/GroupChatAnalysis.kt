@@ -298,7 +298,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         Text(stringResource(R.string.group_chat_analysis_deep_charts), color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(talker, s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
-        var rankingStats by remember { mutableStateOf(s) }
+        var rankingStats by remember(talker) { mutableStateOf(s) }
         LaunchedEffect(rankingRange) {
             if (rankingRange != AnalysisRange.TODAY) {
                 runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.onSuccess { rankingStats = it }
@@ -310,7 +310,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
             rankingStats.ranking.take(10).forEachIndexed { i, v ->
                 val member = members.firstOrNull { it.wxId == v.senderId }
-                if (member != null) RankingItem(i + 1, member.displayName, member.avatarUrl, v.count, maxCount)
+                RankingItem(i + 1, member?.displayName ?: v.senderId, member?.avatarUrl.orEmpty(), v.count, maxCount)
             }
         }
         ExpandableSection(MaterialSymbols.Outlined.Schedule, stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
@@ -505,7 +505,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         val periods = listOf(7, 14, 30, 0)
         var period by remember { mutableStateOf(7) }
         var memberDialog by remember { mutableStateOf(false) }
-        var currentStats by remember { mutableStateOf(s) }
+        var currentStats by remember(talker) { mutableStateOf(s) }
         LaunchedEffect(talker, period) {
             currentStats = runCatching {
                 val range = if (period == 0) AnalysisRange.ALL else AnalysisRange.entries.minByOrNull { kotlin.math.abs(it.days - period) } ?: AnalysisRange.WEEK
