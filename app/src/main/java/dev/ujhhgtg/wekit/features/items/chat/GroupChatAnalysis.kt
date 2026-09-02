@@ -223,7 +223,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     @Composable
     private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
-        val active = remember(stats) { stats.ranking.map { it.first }.toSet() }
+        val active = remember(stats) { stats.ranking.map { it.senderId }.toSet() }
         val inactive = members.filter { it.nickname !in active && it.displayName !in active }
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.group_chat_analysis_activity_detection), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -247,11 +247,11 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
             AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
-            val maxCount = rankingStats.ranking.maxOfOrNull { it.second } ?: 1
+            val maxCount = rankingStats.ranking.maxOfOrNull { it.count } ?: 1
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
             rankingStats.ranking.take(10).forEachIndexed { i, v ->
-                val member = members.firstOrNull { it.nickname == v.first || it.displayName == v.first }
-                RankingItem(i + 1, member?.displayName ?: v.first, member?.avatarUrl.orEmpty(), v.second, maxCount)
+                val member = members.firstOrNull { it.wxId == v.senderId }
+                if (member != null) RankingItem(i + 1, member.displayName, member.avatarUrl, v.count, maxCount)
             }
         }
         ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
@@ -504,6 +504,7 @@ private enum class AnalysisRange(val labelRes: Int, val days: Int) {
 }
 
 private data class AnalysisMessage(val sender: String, val content: String, val createTime: Long)
+private data class RankingEntry(val senderId: String, val count: Int)
 private data class LoadedAnalysis(val stats: GroupAnalysisStats, val messages: List<AnalysisMessage>)
 private data class GroupAnalysisStats(
     val totalMessages: Int,
@@ -513,7 +514,7 @@ private data class GroupAnalysisStats(
     val textMessages: Int,
     val activeUsers: Int,
     val atMeMessages: Int,
-    val ranking: List<Pair<String, Int>>,
+    val ranking: List<RankingEntry>,
     val earlyBird: Int,
     val nightOwl: Int,
     val laugh: Int,
@@ -601,7 +602,7 @@ private object GroupChatAnalysisEngine {
             textMessages = text,
             activeUsers = ranking.size,
             atMeMessages = atMe,
-            ranking = ranking.entries.sortedByDescending { it.value }.map { it.key to it.value },
+            ranking = ranking.entries.sortedByDescending { it.value }.map { RankingEntry(it.key, it.value) },
             earlyBird, nightOwl, laugh, question, exclamation, speechless,
             tiny, short, medium, long, typeStats,
         )
