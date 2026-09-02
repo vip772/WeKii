@@ -141,8 +141,13 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             "历史总消息", it.historyTotalMessages.toString(),
                         )
                     }
-                    ExpandableSection(stringResource(R.string.group_chat_analysis_smart_insight), insightExpanded, { insightExpanded = !insightExpanded }) {
-                        Text(stringResource(R.string.group_chat_analysis_smart_summary), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.group_chat_analysis_smart_insight),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    ExpandableSection(stringResource(R.string.group_chat_analysis_smart_summary), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                             IconButton(onClick = { scope.launch { busy = true; runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }.onSuccess { stats = it }.onFailure { error = it.message }; busy = false } }) {
@@ -423,7 +428,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
     @Composable private fun ExpandableSection(title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            border = CardDefaults.outlinedCardBorder(),
+            colors = CardDefaults.outlinedCardColors(),
+        ) { Column {
             Row(Modifier.fillMaxWidth().clickable { onControlledToggle?.invoke() ?: run { local = !local } }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Text(if (expanded) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium)
             }
