@@ -276,7 +276,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_deep_charts), color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(talker, s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember { mutableStateOf(s) }
         LaunchedEffect(rankingRange) {
@@ -478,9 +478,23 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }
     }
 
-    @Composable private fun ActivityDetectionContent(s: GroupAnalysisStats) {
-        MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString())
-        Text(stringResource(R.string.group_chat_analysis_active_people, s.activeUsers, s.ranking.size))
+    @Composable private fun ActivityDetectionContent(talker: String, s: GroupAnalysisStats) {
+        val accent = accentColor()
+        var period by remember { mutableStateOf(7) }
+        var inactiveOpen by remember { mutableStateOf(false) }
+        Text("检测周期", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(7, 14, 30, 0).forEach { d ->
+                FilterChip(selected = period == d, onClick = { period = d }, label = { Text(if (d == 0) "全部" else "最近${d}天") })
+            }
+        }
+        MetricRow("活跃发言人数", s.activeUsers.toString(), "群聊总人数", s.ranking.size.toString())
+        Text("当前群聊总人数为 ${s.ranking.size} 人", style = MaterialTheme.typography.bodyLarge)
+        TextButton(onClick = { inactiveOpen = true }) { Text("查看/清理未发言成员（${(s.ranking.size - s.activeUsers).coerceAtLeast(0)}人）", color = ComposeColor(0xFFB3261E)) }
+        if (inactiveOpen) {
+            val members = remember { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
+            AlertDialog(onDismissRequest = { inactiveOpen = false }, title = { Text("群聊成员") }, text = { Column(Modifier.verticalScroll(rememberScrollState())) { members.sortedBy { it.displayName }.forEach { member -> Text(member.displayName, Modifier.padding(vertical = 8.dp)) } } }, confirmButton = { TextButton(onClick = { inactiveOpen = false }) { Text("关闭") } })
+        }
     }
     @Composable private fun ExpandableSection(icon: ImageVector, title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
@@ -518,7 +532,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
     @Composable
     private fun MetricTripleRow(a: MetricData, b: MetricData, c: MetricData) {
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = ComposeColor(0xFFFFE4EC))) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFFD1A3) else ComposeColor(0xFFFFE4EC))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 18.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 MetricCard(a, Modifier.weight(1f))
                 MetricCard(b, Modifier.weight(1f))
