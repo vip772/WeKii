@@ -223,7 +223,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp).padding(end = 4.dp), strokeWidth = 2.dp)
                             Text(stringResource(R.string.group_chat_analysis_generate_summary))
                         }
-                        OutlinedButton(onClick = { reportImagePath = runCatching { createReportImage(message.talker, report, stats) }.getOrNull(); shareReportOpen = true }, modifier = Modifier.weight(1f), enabled = report.isNotBlank() && !busy) { Text("生成截图") }
+                        Button(onClick = { reportImagePath = runCatching { createReportImage(message.talker, report, stats) }.getOrNull(); shareReportOpen = true }, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer), modifier = Modifier.weight(1f), enabled = report.isNotBlank() && !busy) { Text("生成截图") }
                         }
                         if (report.isBlank() && !busy) Text(stringResource(R.string.group_chat_analysis_summary_hint), style = MaterialTheme.typography.bodySmall)
                         if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = accentContainer, contentColor = onAccentContainer)) {
@@ -574,16 +574,20 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
     @Composable
     private fun ReportShareDialog(talker: String, report: String, stats: GroupAnalysisStats?, imagePath: String?, onDismiss: () -> Unit) {
-        val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
+        val members = remember(talker) { runCatching { WeDatabaseApi.getGroups() }.getOrDefault(emptyList()) }
+        var query by remember { mutableStateOf("") }
+        val visible = remember(members, query) { members.filter { query.isBlank() || it.displayName.contains(query, true) || it.wxId.contains(query, true) }.sortedWith(compareByDescending<dev.ujhhgtg.wekit.features.api.core.models.WeGroup> { it.wxId == talker }.thenBy { it.displayName }) }
         var selected by remember { mutableStateOf(emptySet<String>()) }
         AlertDialog(onDismissRequest = onDismiss, title = { Text("发送分析截图") }, text = {
-            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
-                members.forEach { member ->
+            Column(Modifier.heightIn(max = 520.dp)) {
+                OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(MaterialSymbols.Outlined.Search, null) }, placeholder = { Text("搜索群聊名称") })
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { member ->
                     Row(Modifier.fillMaxWidth().clickable { selected = if (member.wxId in selected) selected - member.wxId else selected + member.wxId }, verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(member.wxId in selected, null)
                         Text(member.displayName, Modifier.weight(1f))
                     }
-                }
+                } }
             }
         }, confirmButton = { TextButton(onClick = { val path = imagePath ?: createReportImage(talker, report, stats); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
     }
