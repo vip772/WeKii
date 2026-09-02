@@ -232,7 +232,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         var rankingStats by remember { mutableStateOf(s) }
         LaunchedEffect(rankingRange) {
             if (rankingRange != AnalysisRange.TODAY) {
-                runCatching { GroupChatAnalysisEngine.load(currentTalkerForAnalysis, rankingRange).stats }.onSuccess { rankingStats = it }
+                runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.onSuccess { rankingStats = it }
             } else rankingStats = s
         }
         ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
