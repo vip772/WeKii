@@ -30,6 +30,7 @@ import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.Refresh
 import com.composables.icons.materialsymbols.outlined.Tune
 import com.composables.icons.materialsymbols.outlined.Settings
+import com.composables.icons.materialsymbols.outlined.Search
 import com.composables.icons.materialsymbols.outlined.Nights_stay
 import com.composables.icons.materialsymbols.outlined.Wb_sunny
 import com.composables.icons.materialsymbols.outlined.Local_cafe
