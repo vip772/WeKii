@@ -146,6 +146,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
                         }
                     }
+                    androidx.compose.animation.AnimatedVisibility(visible = samplingExpanded, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+                        SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
+                    }
                     Column(
                         Modifier
                             .fillMaxSize()
@@ -239,18 +242,26 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     @Composable
     private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.group_chat_analysis_sampling_settings), color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.group_chat_analysis_analysis_depth), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Slider(value = (limit.coerceIn(500, 5000) - 500) / 4500f, onValueChange = { onLimit(500 + (it * 4500).toInt()) }, modifier = Modifier.weight(1f), colors = SliderDefaults.colors(thumbColor = accentColor(), activeTrackColor = accentColor(), inactiveTrackColor = accentColor().copy(alpha = 0.2f)))
-                Text(if (limit == 5000) "自动" else "${limit}条", color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp))
+        val accent = accentColor()
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+            Column(Modifier.padding(horizontal = 28.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
+                Text("采样设置", color = accent, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                SamplingSlider("分析深度", limit, "条", 500, 5000, accent, onLimit)
+                SamplingSlider("词云提取数", capacity.toIntOrNull() ?: 40, "个", 0, 100, accent, { onCapacity(it.toString()) })
+                SamplingSlider("最小词长", 10, "字", 1, 20, accent, {})
             }
-            Text(stringResource(R.string.group_chat_analysis_word_cloud_count), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.group_chat_analysis_sampling_note), style = MaterialTheme.typography.bodySmall)
-        } }
+        }
     }
-
+    @Composable
+    private fun SamplingSlider(title: String, value: Int, unit: String, min: Int, max: Int, accent: ComposeColor, onValueChange: (Int) -> Unit) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("$value $unit", color = accent, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+            Slider(value = ((value - min).toFloat() / (max - min).coerceAtLeast(1)).coerceIn(0f, 1f), onValueChange = { onValueChange(min + (it * (max - min)).toInt()) }, valueRange = 0f..1f, colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent, inactiveTrackColor = accent.copy(alpha = 0.16f)))
+        }
+    }
     @Composable
     private fun ActivityDetection(talker: String, stats: GroupAnalysisStats, period: Int, onPeriod: (Int) -> Unit, inactiveOpen: Boolean, onInactive: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
