@@ -136,7 +136,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("核心指标", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("核心指标", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
                     stats?.let { it ->
@@ -236,7 +236,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember { mutableStateOf(s) }
@@ -290,17 +290,17 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             "带薪摸鱼" -> colors[2]
             else -> colors[3]
         }
-        Card(modifier.height(160.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f))) {
-            Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Card(modifier.height(128.dp), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f))) {
+            Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(data.icon, contentDescription = title, tint = color, modifier = Modifier.size(42.dp))
-                    Spacer(Modifier.width(12.dp))
+                    Icon(data.icon, contentDescription = title, tint = color, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.width(8.dp))
                     Column {
-                        Text(title, color = color, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(period, color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.titleMedium)
+                        Text(title, color = color, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(period, color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("$count 条", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("$count 条", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -355,19 +355,19 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             Emotion("无语凝噎", s.speechless, MaterialSymbols.Outlined.More_vert, ComposeColor(0xFFAAAAAA)),
         )
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items.forEach { item ->
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(42.dp))
+                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(28.dp))
                             }
-                            Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text(item.title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                         LinearProgressIndicator(
                             progress = { (item.value / maxOf(21f, items.maxOf { it.value }.toFloat())).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = item.color,
+                            modifier = Modifier.fillMaxWidth().padding(start = 48.dp), color = item.color,
                             trackColor = item.color.copy(alpha = 0.12f)
                         )
                     }
@@ -387,19 +387,19 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         )
         val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items.forEach { item ->
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(42.dp))
+                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                Icon(item.icon, item.title, tint = item.color, modifier = Modifier.size(28.dp))
                             }
-                            Text("${item.title} (${item.range})", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("${item.title} (${item.range})", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = item.color, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                         LinearProgressIndicator(
                             progress = { item.value.toFloat() / maxValue },
-                            modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = item.color,
+                            modifier = Modifier.fillMaxWidth().padding(start = 48.dp), color = item.color,
                             trackColor = item.color.copy(alpha = 0.12f)
                         )
                     }
@@ -424,15 +424,15 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         }) }
         val maxValue = items.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items.forEach { item ->
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) { Icon(item.icon, item.name, tint = accentColor(), modifier = Modifier.size(42.dp)) }
-                            Text(item.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(item.value.toString(), color = accentColor(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Icon(item.icon, item.name, tint = accentColor(), modifier = Modifier.size(28.dp)) }
+                            Text(item.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.value.toString(), color = accentColor(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
-                        LinearProgressIndicator(progress = { item.value.toFloat() / maxValue }, modifier = Modifier.fillMaxWidth().padding(start = 72.dp), color = accentColor(), trackColor = accentColor().copy(alpha = 0.12f))
+                        LinearProgressIndicator(progress = { item.value.toFloat() / maxValue }, modifier = Modifier.fillMaxWidth().padding(start = 48.dp), color = accentColor(), trackColor = accentColor().copy(alpha = 0.12f))
                     }
                 }
             }
