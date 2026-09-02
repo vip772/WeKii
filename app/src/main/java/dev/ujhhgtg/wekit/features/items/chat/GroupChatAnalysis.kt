@@ -88,7 +88,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
             }
             val scope = rememberCoroutineScope()
-            var range by remember { mutableStateOf(AnalysisRange.MONTH) }
+            var range by remember { mutableStateOf(AnalysisRange.TODAY) }
             var models by remember { mutableStateOf(emptyList<ModelEntity>()) }
             var model by remember { mutableStateOf<ModelEntity?>(null) }
             var stats by remember { mutableStateOf<GroupAnalysisStats?>(null) }
@@ -114,8 +114,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 model = models.firstOrNull { it.id == selectedModelId } ?: models.firstOrNull()
             }
             LaunchedEffect(Unit) { reloadModels() }
-            LaunchedEffect(range) {
-                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }
+            LaunchedEffect(Unit) {
+                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, AnalysisRange.ALL).stats } }
                     .onSuccess { stats = it }.onFailure { error = it.message }
             }
 
