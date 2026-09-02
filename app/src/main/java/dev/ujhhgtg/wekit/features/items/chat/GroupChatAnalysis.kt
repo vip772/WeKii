@@ -47,6 +47,13 @@ import com.composables.icons.materialsymbols.outlined.Favorite
 import com.composables.icons.materialsymbols.outlined.Mic
 import com.composables.icons.materialsymbols.outlined.Gif_box
 import com.composables.icons.materialsymbols.outlined.Videocam
+import com.composables.icons.materialsymbols.outlined.Groups
+import com.composables.icons.materialsymbols.outlined.Bar_chart
+import com.composables.icons.materialsymbols.outlined.Auto_awesome
+import com.composables.icons.materialsymbols.outlined.Schedule
+import com.composables.icons.materialsymbols.outlined.Mood
+import com.composables.icons.materialsymbols.outlined.Text_fields
+import com.composables.icons.materialsymbols.outlined.Category
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
 import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
@@ -152,7 +159,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-                    ExpandableSection(stringResource(R.string.group_chat_analysis_smart_summary), insightExpanded, { insightExpanded = !insightExpanded }) {
+                    ExpandableSection(MaterialSymbols.Outlined.Auto_awesome, stringResource(R.string.group_chat_analysis_smart_summary), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                             IconButton(onClick = { scope.launch { busy = true; runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }.onSuccess { stats = it }.onFailure { error = it.message }; busy = false } }) {
@@ -237,7 +244,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
 
     @Composable private fun DeepCharts(talker: String, s: GroupAnalysisStats) = Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.group_chat_analysis_deep_charts), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        ExpandableSection(stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Groups, stringResource(R.string.group_chat_analysis_activity_detection)) { ActivityDetectionContent(s) }
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember { mutableStateOf(s) }
         LaunchedEffect(rankingRange) {
@@ -245,7 +252,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.onSuccess { rankingStats = it }
             } else rankingStats = s
         }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_active_ranking)) {
+        ExpandableSection(MaterialSymbols.Outlined.Bar_chart, stringResource(R.string.group_chat_analysis_active_ranking)) {
             AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
             val maxCount = rankingStats.ranking.maxOfOrNull { it.count } ?: 1
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
@@ -254,10 +261,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 if (member != null) RankingItem(i + 1, member.displayName, member.avatarUrl, v.count, maxCount)
             }
         }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_length)) { MessageLengthChart(s) }
-        ExpandableSection(stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Schedule, stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Mood, stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Text_fields, stringResource(R.string.group_chat_analysis_length)) { MessageLengthChart(s) }
+        ExpandableSection(MaterialSymbols.Outlined.Category, stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(s) }
     }
 
     @Composable
@@ -443,7 +450,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         MetricRow(stringResource(R.string.group_chat_analysis_total_messages), s.totalMessages.toString(), stringResource(R.string.group_chat_analysis_active_users), s.activeUsers.toString())
         Text(stringResource(R.string.group_chat_analysis_active_people, s.activeUsers, s.ranking.size))
     }
-    @Composable private fun ExpandableSection(title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    @Composable private fun ExpandableSection(icon: ImageVector, title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
         Card(
             Modifier.fillMaxWidth(),
@@ -452,6 +459,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             colors = CardDefaults.outlinedCardColors(),
         ) { Column {
             Row(Modifier.fillMaxWidth().clickable { onControlledToggle?.invoke() ?: run { local = !local } }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(12.dp))
                 Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); Text(if (expanded) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium)
             }
             if (expanded) { HorizontalDivider(); Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() } }
