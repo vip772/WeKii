@@ -156,7 +156,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                     Text(
                         stringResource(R.string.group_chat_analysis_smart_insight),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = accent,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 4.dp),
@@ -165,7 +165,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                             IconButton(onClick = { scope.launch { busy = true; runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }.onSuccess { stats = it }.onFailure { error = it.message }; busy = false } }) {
-                                Icon(MaterialSymbols.Outlined.Refresh, stringResource(R.string.group_chat_analysis_refresh))
+                                Icon(MaterialSymbols.Outlined.Refresh, stringResource(R.string.group_chat_analysis_refresh), tint = accent)
                             }
                             IconButton(onClick = { scope.launch {
                                 val selected = model
@@ -174,11 +174,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                     ApiDraft(provider?.id.orEmpty(), provider?.baseUrl.orEmpty(), "/chat/completions", provider?.apiKey.orEmpty(), selected.modelIdRemote)
                                 }
                                 settingsOpen = true
-                            } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings)) }
+                            } }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_api_settings), tint = accent) }
                         }
                         AnalysisPeriodSelector(AnalysisRange.entries.toList(), range, { selected -> range = selected; report = "" }, accent)
                         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
                         Button(
+                            colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer),
                             onClick = {
                                 busy = true; error = null; report = ""
                                 scope.launch { runCatching {
@@ -221,10 +222,13 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     @Composable
     private fun SamplingSettings(limit: Int, capacity: String, onLimit: (Int) -> Unit, onCapacity: (String) -> Unit) {
         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.group_chat_analysis_sampling_settings), fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.group_chat_analysis_analysis_depth))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(500, 1000, 2000, 5000).forEach { n -> FilterChip(limit == n, { onLimit(n) }, { Text("${n}条") }) } }
-            Text(stringResource(R.string.group_chat_analysis_word_cloud_count))
+            Text(stringResource(R.string.group_chat_analysis_sampling_settings), color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.group_chat_analysis_analysis_depth), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Slider(value = (limit.coerceIn(500, 5000) - 500) / 4500f, onValueChange = { onLimit(500 + (it * 4500).toInt()) }, modifier = Modifier.weight(1f), colors = SliderDefaults.colors(thumbColor = accentColor(), activeTrackColor = accentColor(), inactiveTrackColor = accentColor().copy(alpha = 0.2f)))
+                Text(if (limit == 5000) "自动" else "${limit}条", color = accentColor(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp))
+            }
+            Text(stringResource(R.string.group_chat_analysis_word_cloud_count), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.group_chat_analysis_sampling_note), style = MaterialTheme.typography.bodySmall)
         } }
     }
