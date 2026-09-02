@@ -1,6 +1,10 @@
 package dev.ujhhgtg.wekit.features.items.chat
 
 import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint
+import java.io.File
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
@@ -73,6 +77,7 @@ import dev.ujhhgtg.wekit.agent.model.*
 import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
+import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
@@ -119,6 +124,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var extra by remember { mutableStateOf("") }
             var busy by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
+            var shareReportOpen by remember { mutableStateOf(false) }
+            var reportImagePath by remember { mutableStateOf<String?>(null) }
             var insightExpanded by remember { mutableStateOf(true) }
             var settingsOpen by remember { mutableStateOf(false) }
             var settingsSeed by remember { mutableStateOf<ApiDraft?>(null) }
@@ -199,6 +206,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         }
                         AnalysisPeriodSelector(AnalysisRange.entries.toList(), range, { selected -> range = selected; report = "" }, accent)
                             OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), minLines = 1, maxLines = 4, placeholder = { Text(stringResource(R.string.group_chat_analysis_extra_requirement_hint)) })
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer),
                             onClick = {
@@ -209,11 +217,13 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                     GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
                                 }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
                             enabled = !busy && model != null,
                         ) {
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp).padding(end = 4.dp), strokeWidth = 2.dp)
                             Text(stringResource(R.string.group_chat_analysis_generate_summary))
+                        }
+                        OutlinedButton(onClick = { reportImagePath = runCatching { createReportImage(message.talker, report, stats) }.getOrNull(); shareReportOpen = true }, modifier = Modifier.weight(1f), enabled = report.isNotBlank() && !busy) { Text("生成截图") }
                         }
                         if (report.isBlank() && !busy) Text(stringResource(R.string.group_chat_analysis_summary_hint), style = MaterialTheme.typography.bodySmall)
                         if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = accentContainer, contentColor = onAccentContainer)) {
@@ -236,6 +246,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 text = { SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it }) },
                 confirmButton = { TextButton(onClick = { modelSamplingOpen = false }) { Text("完成") } },
             )
+            if (shareReportOpen) ReportShareDialog(message.talker, report, stats, reportImagePath, { shareReportOpen = false })
             if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
                 val providerId = draft.providerId.ifBlank { "group-analysis-${UUID.randomUUID()}" }
                 val provider = ModelProviderEntity(providerId, ModelProviderType.OPENAI_CHAT_COMPLETION, "群聊分析 API", normalizeApiBase(draft.baseUrl, draft.apiPath), draft.apiKey)
@@ -561,6 +572,45 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         var selected by remember { mutableStateOf(emptySet<String>()) }; var query by remember { mutableStateOf("") }; val ids=inactive.map{it.wxId}.toSet(); val ordered=inactive+members.filterNot{it.wxId in ids}; val visible=ordered.filter{query.isBlank()||it.displayName.contains(query,true)||it.wxId.contains(query,true)}
         AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.heightIn(max=520.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
     }
+    @Composable
+    private fun ReportShareDialog(talker: String, report: String, stats: GroupAnalysisStats?, imagePath: String?, onDismiss: () -> Unit) {
+        val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
+        var selected by remember { mutableStateOf(emptySet<String>()) }
+        AlertDialog(onDismissRequest = onDismiss, title = { Text("发送分析截图") }, text = {
+            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
+                members.forEach { member ->
+                    Row(Modifier.fillMaxWidth().clickable { selected = if (member.wxId in selected) selected - member.wxId else selected + member.wxId }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(member.wxId in selected, null)
+                        Text(member.displayName, Modifier.weight(1f))
+                    }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { val path = imagePath ?: createReportImage(talker, report, stats); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+    }
+
+    private fun createReportImage(talker: String, report: String, stats: GroupAnalysisStats?): String {
+        val width = 900
+        val lines = report.lines().flatMap { line -> if (line.length <= 28) listOf(line) else line.chunked(28) }
+        val height = (260 + lines.size * 44).coerceAtLeast(900)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(bitmap)
+        canvas.drawColor(Color.rgb(232, 243, 255))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(55, 55, 55); textSize = 30f; typeface = android.graphics.Typeface.DEFAULT }
+        val title = Paint(paint).apply { color = Color.rgb(35, 70, 105); textSize = 48f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        canvas.drawText("群聊分析报告", 60f, 80f, title)
+        paint.textSize = 22f
+        canvas.drawText("群聊：$talker", 60f, 125f, paint)
+        canvas.drawText("群聊人数：${stats?.historyTotalMessages ?: 0}    发言人数：${stats?.activeUsers ?: 0}", 60f, 160f, paint)
+        canvas.drawText("生成时间：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}", 60f, 195f, paint)
+        var y = 250f
+        paint.textSize = 28f
+        lines.forEach { line -> canvas.drawText(line, 60f, y, paint); y += 44f }
+        val file = File.createTempFile("group-report-", ".png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        return file.absolutePath
+    }
+
     @Composable private fun ExpandableSection(icon: ImageVector, title: String, controlledExpanded: Boolean? = null, onControlledToggle: (() -> Unit)? = null, content: @Composable () -> Unit) {
         var local by remember { mutableStateOf(false) }; val expanded = controlledExpanded ?: local
         Card(
@@ -597,7 +647,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     private fun normalizeApiBase(base: String, path: String): String { val b = base.trim().trimEnd('/'); val p = path.trim().let { if (it.startsWith('/')) it else "/$it" }; return if (b.endsWith(p)) b.removeSuffix(p) else b }
     @Composable
     private fun MetricTripleRow(a: MetricData, b: MetricData, c: MetricData) {
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor(0xFFFFD1A3) else ComposeColor(0xFFFFE4EC))) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(34.dp), colors = CardDefaults.cardColors(containerColor = if (MaterialTheme.colorScheme.background.red < 0.2f) ComposeColor.Transparent else ComposeColor(0xFFFFE4EC))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 18.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 MetricCard(a, Modifier.weight(1f))
                 MetricCard(b, Modifier.weight(1f))
