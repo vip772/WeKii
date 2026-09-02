@@ -309,7 +309,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
             rankingStats.ranking.take(10).forEachIndexed { i, v ->
                 val member = members.firstOrNull { it.wxId == v.senderId }
-                RankingItem(i + 1, member?.displayName ?: 未知成员, member?.avatarUrl.orEmpty(), v.count, maxCount)
+                RankingItem(i + 1, member?.displayName ?: "未知成员", member?.avatarUrl.orEmpty(), v.count, maxCount)
             }
             Button(onClick = { rankingShareOpen = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = accentColor())) {
                 Text("生成截图")
@@ -609,7 +609,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         canvas.drawText("活跃发言排行", 50f, 60f, paint)
         canvas.drawText(WeDatabaseApi.getGroup(talker)?.displayName ?: "群聊", 50f, 105f, paint)
         entries.forEachIndexed { index, entry ->
-            val name = members.firstOrNull { it.wxId == entry.senderId }?.displayName ?: 未知成员
+            val name = members.firstOrNull { it.wxId == entry.senderId }?.displayName ?: "未知成员"
             canvas.drawText("${index + 1}. $name    ${entry.count}条", 50f, 160f + index * 55f, paint)
         }
         val file = File.createTempFile("active-ranking-", ".png")
@@ -804,7 +804,7 @@ private object GroupChatAnalysisEngine {
                 val createTime = cursor.getLong(timeIndex)
                 val type = cursor.getInt(typeIndex)
                 val isSend = cursor.getInt(sendIndex) != 0
-                val sender = if (isSend) localizedSenderMe() else 未知成员
+                val sender = if (isSend) localizedSenderMe() else "未知成员"
                 ranking[sender] = (ranking[sender] ?: 0) + 1
                 if (createTime >= todayStart) { todayMessages++; todayRanking[sender] = (todayRanking[sender] ?: 0) + 1 }
                 val typeName = messageTypeName(type)
