@@ -169,8 +169,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     ExpandableSection(MaterialSymbols.Outlined.Auto_awesome, stringResource(R.string.group_chat_analysis_smart_summary), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                            IconButton(onClick = { scope.launch { busy = true; runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range).stats } }.onSuccess { stats = it }.onFailure { error = it.message }; busy = false } }) {
-                                Icon(MaterialSymbols.Outlined.Refresh, stringResource(R.string.group_chat_analysis_refresh), tint = accent)
+                            IconButton(onClick = { samplingExpanded = true }) {
+                                Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
                             }
                             IconButton(onClick = { scope.launch {
                                 val selected = model
