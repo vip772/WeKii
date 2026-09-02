@@ -28,6 +28,7 @@ import androidx.core.graphics.drawable.toDrawable
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.Refresh
+import com.composables.icons.materialsymbols.outlined.Tune
 import com.composables.icons.materialsymbols.outlined.Settings
 import com.composables.icons.materialsymbols.outlined.Nights_stay
 import com.composables.icons.materialsymbols.outlined.Wb_sunny
@@ -140,13 +141,17 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             Text("分析报告", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                             Text("2026/08/31 ~ 2026/09/01", color = accent, style = MaterialTheme.typography.titleMedium)
                         }
-                        IconButton(onClick = { samplingExpanded = !samplingExpanded }) { Icon(MaterialSymbols.Outlined.Settings, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent) }
+                        IconButton(onClick = { samplingExpanded = !samplingExpanded }) {
+                            Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
+                        }
                     }
                     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("核心指标", Modifier.weight(1f), color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
-                    if (samplingExpanded) SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
+                    if (samplingExpanded) {
+                        SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it })
+                    }
                     stats?.let { it ->
                         MetricTripleRow(
                             MetricData("今日发言人数", it.todayActiveUsers.toString(), MaterialSymbols.Outlined.Groups),
