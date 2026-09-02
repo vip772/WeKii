@@ -24,8 +24,8 @@
     <string name="group_chat_analysis_length">廢話程度鑑定</string>
     <string name="group_chat_analysis_content_preference">內容載體偏好</string>
     <string name="group_chat_analysis_today">今日</string>
-    <string name="group_chat_analysis_week">最近 7 天</string>
-    <string name="group_chat_analysis_month">最近 30 天</string>
+    <string name="group_chat_analysis_week">本周</string>
+    <string name="group_chat_analysis_month">本月</string>
     <string name="group_chat_analysis_year">最近一年</string>
     <string name="group_chat_analysis_all">全部記錄</string>
     <string name="group_chat_analysis_smart_insight">智能洞察</string>

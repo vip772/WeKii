@@ -24,8 +24,8 @@
     <string name="group_chat_analysis_length">Message length</string>
     <string name="group_chat_analysis_content_preference">Content preference</string>
     <string name="group_chat_analysis_today">Today</string>
-    <string name="group_chat_analysis_week">Last 7 days</string>
-    <string name="group_chat_analysis_month">Last 30 days</string>
+    <string name="group_chat_analysis_week">This week</string>
+    <string name="group_chat_analysis_month">This month</string>
     <string name="group_chat_analysis_year">Last year</string>
     <string name="group_chat_analysis_all">All available</string>
     <string name="group_chat_analysis_smart_insight">Smart insights</string>
