@@ -114,6 +114,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             var settingsOpen by remember { mutableStateOf(false) }
             var settingsSeed by remember { mutableStateOf<ApiDraft?>(null) }
             var samplingExpanded by remember { mutableStateOf(false) }
+            var modelSamplingOpen by remember { mutableStateOf(false) }
             var sampleLimit by remember { mutableStateOf(5000) }
             var contextCapacity by remember { mutableStateOf("自动") }
             var activityPeriod by remember { mutableStateOf(7) }
@@ -169,8 +170,8 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     ExpandableSection(MaterialSymbols.Outlined.Auto_awesome, stringResource(R.string.group_chat_analysis_smart_summary), insightExpanded, { insightExpanded = !insightExpanded }) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(R.string.group_chat_analysis_select_period), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                            IconButton(onClick = { samplingExpanded = true }) {
-                                Icon(MaterialSymbols.Outlined.Tune, stringResource(R.string.group_chat_analysis_sampling_settings), tint = accent)
+                            IconButton(onClick = { modelSamplingOpen = true }) {
+                                Icon(MaterialSymbols.Outlined.Tune, "模型容量与采样", tint = accent)
                             }
                             IconButton(onClick = { scope.launch {
                                 val selected = model
