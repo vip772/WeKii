@@ -3801,3 +3801,5 @@
     <string name="monet_generate">Generate</string>
     <string name="feature_script_plugin_name">Plugin</string>
     <string name="feature_script_plugin_description">Manage and run BeanShell Java plugins</string>
+
+</resources>

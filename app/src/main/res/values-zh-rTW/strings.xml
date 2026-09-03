@@ -3811,3 +3811,5 @@
     <string name="monet_generate">產生</string>
     <string name="feature_script_plugin_name">插件</string>
     <string name="feature_script_plugin_description">管理並執行 BeanShell Java 插件</string>
+
+</resources>
