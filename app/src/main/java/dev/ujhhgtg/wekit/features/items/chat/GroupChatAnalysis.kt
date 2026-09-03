@@ -2,9 +2,11 @@ package dev.ujhhgtg.wekit.features.items.chat
 
 import android.graphics.Color
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import java.io.File
+import java.net.URL
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
@@ -593,7 +595,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             onDismissRequest = onDismiss,
             title = { Text("发送活跃排行截图") },
             text = {
-                Column(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
                     OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(MaterialSymbols.Outlined.Search, null) }, placeholder = { Text("搜索群聊名称") })
                     Spacer(Modifier.height(8.dp))
                     Column(Modifier.fillMaxWidth().heightIn(min = 280.dp).verticalScroll(rememberScrollState())) {
@@ -647,14 +649,28 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             val member = members.firstOrNull { it.wxId == entry.senderId }
             val name = member?.displayName?.ifBlank { member.nickname }?.ifBlank { "未知成员" } ?: if (entry.senderId == WeApi.selfWxId) "我" else "未知成员"
             val avatarLeft = 132f
-            if (!member?.avatarUrl.isNullOrBlank()) {
-                // The image URL is loaded by Compose; Canvas cannot synchronously decode it here.
-                // Draw a stable avatar placeholder while retaining the same geometry as the UI row.
-                val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 188, 150) }
-                canvas.drawCircle(avatarLeft + 22f, top + 39f, 22f, avatarPaint)
-            } else {
-                val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 188, 150) }
-                canvas.drawCircle(avatarLeft + 22f, top + 39f, 22f, avatarPaint)
+            val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 188, 150) }
+            canvas.drawCircle(avatarLeft + 22f, top + 39f, 22f, avatarPaint)
+            val avatarUrl = member?.avatarUrl.orEmpty()
+            if (avatarUrl.isNotBlank()) {
+                runCatching {
+                    val avatarBitmap = URL(avatarUrl).openStream().use { BitmapFactory.decodeStream(it) }
+                    if (avatarBitmap != null) {
+                        val sourceSize = minOf(avatarBitmap.width, avatarBitmap.height)
+                        val source = android.graphics.Rect(
+                            (avatarBitmap.width - sourceSize) / 2,
+                            (avatarBitmap.height - sourceSize) / 2,
+                            (avatarBitmap.width + sourceSize) / 2,
+                            (avatarBitmap.height + sourceSize) / 2,
+                        )
+                        val target = android.graphics.RectF(avatarLeft, top + 17f, avatarLeft + 44f, top + 61f)
+                        canvas.save()
+                        canvas.clipPath(android.graphics.Path().apply { addCircle(avatarLeft + 22f, top + 39f, 22f, android.graphics.Path.Direction.CW) })
+                        canvas.drawBitmap(avatarBitmap, source, target, null)
+                        canvas.restore()
+                        avatarBitmap.recycle()
+                    }
+                }
             }
             canvas.drawText(name, avatarLeft + 58f, top + 45f, namePaint)
             canvas.drawText("${entry.count} 条", width - 76f, top + 45f, countPaint)
@@ -673,7 +689,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
     @Composable private fun InactiveMemberDialog(talker:String,members:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,inactive:List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>,onDismiss:()->Unit) {
         var selected by remember { mutableStateOf(emptySet<String>()) }; var query by remember { mutableStateOf("") }; val ids=inactive.map{it.wxId}.toSet(); val ordered=inactive+members.filterNot{it.wxId in ids}; val visible=ordered.filter{query.isBlank()||it.displayName.contains(query,true)||it.wxId.contains(query,true)}
-        AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.fillMaxWidth().heightIn(max=520.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
+        AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.fillMaxWidth().heightIn(max=550.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
     }
     @Composable
     private fun ReportShareDialog(talker: String, report: String, stats: GroupAnalysisStats?, imagePath: String?, onDismiss: () -> Unit) {
@@ -682,7 +698,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         val visible = remember(members, query) { members.filter { query.isBlank() || it.displayName.contains(query, true) || it.wxId.contains(query, true) }.sortedWith(compareByDescending<dev.ujhhgtg.wekit.features.api.core.models.WeGroup> { it.wxId == talker }.thenBy { it.displayName }) }
         var selected by remember { mutableStateOf(emptySet<String>()) }
         AlertDialog(onDismissRequest = onDismiss, title = { Text("发送分析截图") }, text = {
-            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 550.dp)) {
                 OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, leadingIcon = { Icon(MaterialSymbols.Outlined.Search, null) }, placeholder = { Text("搜索群聊名称") })
                 Spacer(Modifier.height(8.dp))
                 Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { member ->
