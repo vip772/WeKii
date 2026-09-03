@@ -24,7 +24,7 @@ data class JavaPlugin(
             runCatching { content.reader().use { props.load(it) } }.getOrElse {
                 content.lineSequence().forEach { line ->
                     val trimmed = line.trim()
-                    val eq = trimmed.indexOf(=)
+                    val eq = trimmed.indexOf('=')
                     if (eq > 0 && !trimmed.startsWith("#")) {
                         props[trimmed.substring(0, eq).trim()] = trimmed.substring(eq + 1).trim()
                     }
