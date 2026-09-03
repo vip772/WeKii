@@ -46,11 +46,11 @@ import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
-import dev.ujhhgtg.wekit.ui.utils.MofangVoiceIcon
 import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.ui.utils.MofangVoiceIcon
+import com.composables.icons.materialsymbols.outlined.Info
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.android.showToast
 import dev.ujhhgtg.wekit.utils.coerceToInt
@@ -86,7 +86,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
         WeChatMessageContextMenuApi.MenuItem(
             id = MENU_ID,
             text = localizedChatString(R.string.mofang_voice_menu),
-            drawable = MofangVoiceIcon,
+            drawable = menuIcon,
             imageVector = MaterialSymbols.Outlined.Info,
             isSupported = { true },
             multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
