@@ -241,10 +241,28 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
         } else {
             disabledFlag.writeText("")
         }
+        if (isEnabled) {
+            if (enabled) loadSingleScript(scriptDir) else unloadSingleScript(scriptDir.name)
+        }
         true
     }.onFailure {
         WeLogger.w(TAG, "failed to ${if (enabled) "enable" else "disable"} script '${scriptDir.name}'", it)
     }.getOrDefault(false)
+
+    private fun loadSingleScript(scriptDir: Path) {
+        if (!isEnabled || scripts.containsKey(scriptDir.name)) return
+        val mainFile = scriptDir / "main.java"
+        val infoFile = scriptDir / "info.prop"
+        if (!mainFile.exists() || !infoFile.exists()) return
+        val info = JavaPlugin.parseInfoProp(infoFile.readText())
+        val plugin = JavaPlugin(scriptDir.name, scriptDir, info, mainFile.readText(), Interpreter(null, ""))
+        scripts[scriptDir.name] = plugin
+        JavaEngine.executeAllOnLoad(mapOf(scriptDir.name to plugin))
+    }
+
+    private fun unloadSingleScript(name: String) {
+        scripts.remove(name)?.let { JavaEngine.executeAllOnUnload(mapOf(name to it)) }
+    }
 
     override fun onDisable() {
         synchronized(lifecycleLock) {
