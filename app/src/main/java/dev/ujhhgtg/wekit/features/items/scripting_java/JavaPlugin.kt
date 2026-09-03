@@ -2,6 +2,7 @@ package dev.ujhhgtg.wekit.features.items.scripting_java
 
 import bsh.Interpreter
 import java.nio.file.Path
+import java.util.Properties
 
 data class JavaPluginInfo(
     val name: String,
@@ -19,20 +20,23 @@ data class JavaPlugin(
 ) {
     companion object {
         fun parseInfoProp(content: String): JavaPluginInfo {
-            val props = mutableMapOf<String, String>()
-            for (line in content.lines()) {
-                val trimmed = line.trim()
-                if (trimmed.isEmpty() || trimmed.startsWith('#')) continue
-                val eq = trimmed.indexOf('=')
-                if (eq > 0) {
-                    props[trimmed.substring(0, eq).trim()] = trimmed.substring(eq + 1).trim()
+            val props = Properties()
+            runCatching { content.reader().use { props.load(it) } }.getOrElse {
+                content.lineSequence().forEach { line ->
+                    val trimmed = line.trim()
+                    val eq = trimmed.indexOf(=)
+                    if (eq > 0 && !trimmed.startsWith("#")) {
+                        props[trimmed.substring(0, eq).trim()] = trimmed.substring(eq + 1).trim()
+                    }
                 }
             }
+            fun value(vararg keys: String): String? =
+                keys.firstNotNullOfOrNull { key -> props.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() } }
             return JavaPluginInfo(
-                name = props["name"] ?: "unnamed",
-                author = props["author"],
-                version = props["version"],
-                updateTime = props["updateTime"]
+                name = value("name", "pluginName", "title") ?: "unnamed",
+                author = value("author", "作者"),
+                version = value("version", "版本"),
+                updateTime = value("updateTime", "update_time", "更新时间")
             )
         }
     }
