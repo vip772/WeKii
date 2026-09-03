@@ -303,6 +303,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         var rankingRange by remember { mutableStateOf(AnalysisRange.TODAY) }
         var rankingStats by remember(talker) { mutableStateOf(s) }
         var rankingShareOpen by remember { mutableStateOf(false) }
+        var rankingLimitText by remember(talker) { mutableStateOf("10") }
         LaunchedEffect(talker, rankingRange) {
             rankingStats = runCatching { GroupChatAnalysisEngine.load(talker, rankingRange).stats }.getOrDefault(s)
         }
@@ -314,10 +315,21 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 val member = members.firstOrNull { it.wxId == v.senderId }
                 RankingItem(i + 1, member?.displayName ?: "未知成员", member?.avatarUrl.orEmpty(), v.count, maxCount)
             }
-            Button(onClick = { rankingShareOpen = true }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = accentColor())) {
-                Text("生成截图")
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = { rankingShareOpen = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = accentColor())) {
+                    Text("生成截图")
+                }
+                OutlinedTextField(
+                    value = rankingLimitText,
+                    onValueChange = { value -> rankingLimitText = value.filter { it.isDigit() }.take(3) },
+                    modifier = Modifier.width(92.dp),
+                    singleLine = true,
+                    label = { Text("名次") },
+                    suffix = { Text("名") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                )
             }
-            if (rankingShareOpen) RankingShareDialog(talker, rankingStats, members) { rankingShareOpen = false }
+            if (rankingShareOpen) RankingShareDialog(talker, rankingStats, members, rankingLimitText.toIntOrNull()?.coerceAtLeast(1) ?: 10) { rankingShareOpen = false }
         }
         var todayStats by remember(talker) { mutableStateOf<GroupAnalysisStats?>(null) }
         LaunchedEffect(talker) {
@@ -585,7 +597,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     }
 
     @Composable
-    private fun RankingShareDialog(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, onDismiss: () -> Unit) {
+    private fun RankingShareDialog(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, rankingLimit: Int, onDismiss: () -> Unit) {
         val groups = remember(talker) { runCatching { WeDatabaseApi.getGroups() }.getOrDefault(emptyList()) }
         var query by remember { mutableStateOf("") }
         var selected by remember { mutableStateOf(emptySet<String>()) }
@@ -608,13 +620,13 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { val path = createRankingImage(talker, stats, members); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } },
+            confirmButton = { TextButton(onClick = { val path = createRankingImage(talker, stats, members, rankingLimit); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } },
             dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
         )
     }
 
-    private fun createRankingImage(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>): String {
-        val entries = stats.ranking.take(10)
+    private fun createRankingImage(talker: String, stats: GroupAnalysisStats, members: List<dev.ujhhgtg.wekit.features.api.core.models.WeContact>, rankingLimit: Int = 10): String {
+        val entries = stats.ranking.take(rankingLimit.coerceAtLeast(1))
         val width = 900
         val headerHeight = 178
         val rowHeight = 112
