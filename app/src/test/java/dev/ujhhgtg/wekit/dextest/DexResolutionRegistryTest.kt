@@ -27,7 +27,7 @@ class DexResolutionRegistryTest {
     fun pathBackedFeaturesCanInitializeOnDesktop() {
         listOf(
             "dev.ujhhgtg.wekit.features.items.beautify.Themes",
-            "dev.ujhhgtg.wekit.features.items.scripting_java.JavaScriptingHook",
+            "dev.ujhhgtg.wekit.features.items.scripting_java.ScriptPlugin",
             "dev.ujhhgtg.wekit.features.items.contacts.CustomLocalFriendAvatars",
         ).forEach { className ->
             assertDoesNotThrow {

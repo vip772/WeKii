@@ -26,6 +26,8 @@ import dev.ujhhgtg.wekit.features.api.core.WeServiceApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
+import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
+import android.graphics.drawable.ColorDrawable
 import dev.ujhhgtg.wekit.features.api.ui.WeMomentsApi
 import dev.ujhhgtg.wekit.extensions.ScriptDepsPack
 import dev.ujhhgtg.wekit.utils.AudioUtils
@@ -94,6 +96,7 @@ object JavaEngine {
     }
 
     fun executeAllOnUnload(scripts: Map<String, JavaPlugin>) {
+        unregisterAllPluginMenus()
         scripts.values.forEach { plugin ->
             try {
                 val bshMethod = plugin.interpreter.nameSpace.getMethod("onUnload", emptyArray())
@@ -216,6 +219,16 @@ object JavaEngine {
                 WeLogger.e(TAG, "onRecvPayMsg execution failed for script ${plugin.name}", e)
             }
         }
+    }
+
+    private val menuProviders = java.util.concurrent.ConcurrentHashMap<String, WeChatMessageContextMenuApi.IMenuItemsProvider>()
+
+    private fun unregisterPluginMenu(pluginId: String) {
+        menuProviders.remove(pluginId)?.let { WeChatMessageContextMenuApi.removeProvider(it) }
+    }
+
+    private fun unregisterAllPluginMenus() {
+        menuProviders.keys.toList().forEach(::unregisterPluginMenu)
     }
 
     fun initPlugin(plugin: JavaPlugin) {
@@ -1917,6 +1930,32 @@ object JavaEngine {
                         .self
                     uploadMethod.invoke(getInstance.invoke(null), System.currentTimeMillis() / 1000, stepCount)
                 }.onFailure { WeLogger.e(TAG, "uploadDeviceStep failed", it) }
+            })
+            setMethod(BshMethod("registerMenu", arrayOf(BString, BString, Consumer::class.java)) { args ->
+                val menuId = ("script_" + plugin.name + "_" + (args[0] as String)).hashCode()
+                val callback = args[2] as Consumer<Any?>
+                val provider = object : WeChatMessageContextMenuApi.IMenuItemsProvider {
+                    override fun getMenuItems() = listOf(
+                        WeChatMessageContextMenuApi.MenuItem(
+                            id = menuId,
+                            text = args[1] as String,
+                            drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
+                            imageVector = com.composables.icons.materialsymbols.MaterialSymbols.Outlined.Info,
+                            isSupported = { true },
+                            onClick = { view, context, msg ->
+                                runCatching { callback.accept(arrayOf(view, context, msg)) }
+                                    .onFailure { WeLogger.e(TAG, "plugin menu callback failed for ${plugin.name}", it) }
+                            },
+                        ),
+                    )
+                }
+                unregisterPluginMenu(plugin.name)
+                menuProviders[plugin.name] = provider
+                WeChatMessageContextMenuApi.addProvider(provider)
+                menuId
+            })
+            setMethod(BshMethod("unregisterMenus", emptyArray<Class<*>>()) {
+                unregisterPluginMenu(plugin.name)
             })
             setMethod(BshMethod("reloadPlugin", emptyArray<Class<*>>()) {
                 val pluginName = plugin.name
