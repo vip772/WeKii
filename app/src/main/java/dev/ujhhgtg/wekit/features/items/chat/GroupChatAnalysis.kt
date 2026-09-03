@@ -317,10 +317,20 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             }
             if (rankingShareOpen) RankingShareDialog(talker, rankingStats, members) { rankingShareOpen = false }
         }
-        ExpandableSection(MaterialSymbols.Outlined.Schedule, stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(s) }
-        ExpandableSection(MaterialSymbols.Outlined.Mood, stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(s) }
-        ExpandableSection(MaterialSymbols.Outlined.Text_fields, stringResource(R.string.group_chat_analysis_length)) { MessageLengthChart(s) }
-        ExpandableSection(MaterialSymbols.Outlined.Category, stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(s) }
+        var todayStats by remember(talker) { mutableStateOf<GroupAnalysisStats?>(null) }
+        LaunchedEffect(talker) {
+            todayStats = runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(talker, AnalysisRange.TODAY).stats } }.getOrNull()
+        }
+        val dayStats = todayStats ?: s.copy(
+            totalMessages = 0, historyTotalMessages = 0, todayMessages = 0, todayActiveUsers = 0,
+            textMessages = 0, activeUsers = 0, atMeMessages = 0, ranking = emptyList(),
+            earlyBird = 0, nightOwl = 0, laugh = 0, question = 0, exclamation = 0, speechless = 0,
+            tiny = 0, short = 0, medium = 0, long = 0, typeStats = emptyMap(),
+        )
+        ExpandableSection(MaterialSymbols.Outlined.Schedule, stringResource(R.string.group_chat_analysis_routine)) { RoutineChart(dayStats) }
+        ExpandableSection(MaterialSymbols.Outlined.Mood, stringResource(R.string.group_chat_analysis_emotion)) { EmotionFingerprint(dayStats) }
+        ExpandableSection(MaterialSymbols.Outlined.Text_fields, stringResource(R.string.group_chat_analysis_length)) { MessageLengthChart(dayStats) }
+        ExpandableSection(MaterialSymbols.Outlined.Category, stringResource(R.string.group_chat_analysis_content_preference)) { ContentPreferenceChart(dayStats) }
     }
 
     @Composable
@@ -852,10 +862,11 @@ private object GroupChatAnalysisEngine {
                 val senderId = if (isSend) WeApi.selfWxId else match?.groupValues?.get(1)?.trim().orEmpty()
                 val contentBody = if (isSend) raw else match?.groupValues?.get(2) ?: raw
                 val senderName = if (isSend) localizedSenderMe() else memberNames[senderId] ?: "未知成员"
+                // 今日消息数按数据库中的消息行统计，不能依赖发送者解析或消息类型。
+                if (createTime >= todayStart) todayMessages++
                 if (senderId.isNotBlank()) {
                     ranking[senderId] = (ranking[senderId] ?: 0) + 1
                     if (createTime >= todayStart) {
-                        todayMessages++
                         todayRanking[senderId] = (todayRanking[senderId] ?: 0) + 1
                     }
                 }
