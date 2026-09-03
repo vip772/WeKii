@@ -57,17 +57,17 @@ import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
-object JavaScriptingHook : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUpdateListener, WeDatabaseListenerApi.IInsertListener {
+object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUpdateListener, WeDatabaseListenerApi.IInsertListener {
 
-    override val technicalId = "脚本引擎 (Java)"
-    override val nameRes = R.string.feature_java_scripting_hook_name
+    override val technicalId = "插件"
+    override val nameRes = R.string.feature_script_plugin_name
     override val categoryIds = listOf(FeatureCategoryIds.SCRIPTING_JAVA)
-    override val descriptionRes = R.string.feature_java_scripting_hook_description
+    override val descriptionRes = R.string.feature_script_plugin_description
 
-    private const val TAG = "JavaScriptingHook"
+    private const val TAG = "ScriptPlugin"
     private const val DISABLED_FLAG = "disabled.flag"
 
-    private val SCRIPTS_DIR by lazy { (KnownPaths.moduleData / "scripts_java").createDirsSafe() }
+    private val SCRIPTS_DIR by lazy { (KnownPaths.moduleData / "plugins_java").createDirsSafe() }
 
     val scripts = ConcurrentHashMap<String, JavaPlugin>()
     private val lifecycleLock = Any()

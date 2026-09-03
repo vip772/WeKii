@@ -3809,4 +3809,5 @@
     <string name="monet_user_current">目前使用者</string>
     <string name="monet_user_all">全部使用者</string>
     <string name="monet_generate">產生</string>
-</resources>
+    <string name="feature_script_plugin_name">插件</string>
+    <string name="feature_script_plugin_description">管理並執行 BeanShell Java 插件</string>

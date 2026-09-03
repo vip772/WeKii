@@ -3799,4 +3799,5 @@
     <string name="monet_user_current">Current user</string>
     <string name="monet_user_all">All users</string>
     <string name="monet_generate">Generate</string>
-</resources>
+    <string name="feature_script_plugin_name">Plugin</string>
+    <string name="feature_script_plugin_description">Manage and run BeanShell Java plugins</string>
