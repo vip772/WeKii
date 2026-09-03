@@ -84,7 +84,9 @@ object JavaEngine {
             BypassScriptsDrm.registerInterpreter(plugin.interpreter)
             try {
                 initPlugin(plugin)
+                pluginLog(plugin, "evaluating plugin")
                 plugin.interpreter.eval(plugin.content)
+                pluginLog(plugin, "plugin evaluated successfully")
 
                 val bshMethod = plugin.interpreter.nameSpace.getMethod("onLoad", emptyArray())
                 bshMethod?.apply {
@@ -246,8 +248,20 @@ object JavaEngine {
 
     fun initNameSpace(nameSpace: NameSpace, plugin: JavaPlugin) {
         nameSpace.apply {
+            // ===== Script API type imports =====
+            // BeanShell has its own namespace and does not inherit imports from this host file.
+            importClass(MsgInfoBean::class.java)
+            importClass(ContactLabelBean::class.java)
+            importClass(FriendInfo::class.java)
+            importClass(GroupInfo::class.java)
+            importClass(me.hd.wauxv.data.bean.PayMsgBean::class.java)
+            importPackage(WeApi::class.java.getPackage())
+            importPackage(WeMessageApi::class.java.getPackage())
+            importPackage(WeContactApi::class.java.getPackage())
+            importPackage(WeGroupApi::class.java.getPackage())
+            importPackage(WeDatabaseApi::class.java.getPackage())
+            importPackage(WeChatMessageContextMenuApi::class.java.getPackage())
             // ===== Host Info =====
-
             setVariable("hostContext", HostInfo.application)
             setVariable("hostVerName", HostInfo.versionName)
             setVariable("hostVerCode", HostInfo.versionCode.toInt())
@@ -493,7 +507,7 @@ object JavaEngine {
                     "log", arrayOf(any)
                 ) {
                     val message = it[0]
-                    WeLogger.i(plugin.name, message.toString())
+                    pluginLog(plugin, message.toString())
                 })
 
             // ===== Toast =====
@@ -1975,6 +1989,15 @@ object JavaEngine {
                     return@BshMethod getTopMostActivity()
                 })
         }
+    }
+
+    private fun pluginLog(plugin: JavaPlugin, message: String) {
+        runCatching {
+            val file = plugin.dir.resolve("plugin.log").toFile()
+            file.parentFile?.mkdirs()
+            val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())
+            file.appendText("[" + time + "] " + message + "\n", Charsets.UTF_8)
+        }.onFailure { WeLogger.e(TAG, "failed writing plugin log for ${plugin.name}", it) }
     }
 
     // ========== Config Helpers ==========
