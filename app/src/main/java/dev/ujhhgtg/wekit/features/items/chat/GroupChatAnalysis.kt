@@ -310,7 +310,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             AnalysisPeriodSelector(AnalysisRange.entries.toList(), rankingRange, { rankingRange = it }, accentColor())
             val maxCount = rankingStats.ranking.maxOfOrNull { it.count } ?: 1
             val members = remember(talker) { runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList()) }
-            rankingStats.ranking.take(rankingLimitText.toIntOrNull()?.coerceAtLeast(1) ?: 10).forEachIndexed { i, v ->
+            rankingStats.ranking.forEachIndexed { i, v ->
                 val member = members.firstOrNull { it.wxId == v.senderId }
                 RankingItem(i + 1, member?.displayName ?: "未知成员", member?.avatarUrl.orEmpty(), v.count, maxCount)
             }
@@ -321,7 +321,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 OutlinedTextField(
                     value = rankingLimitText,
                     onValueChange = { value -> rankingLimitText = value.filter { it.isDigit() }.take(3) },
-                    modifier = Modifier.width(92.dp).height(56.dp),
+                    modifier = Modifier.width(72.dp).height(56.dp),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.titleMedium.copy(color = accentColor()),
                     placeholder = { Text("10", color = accentColor()) },
