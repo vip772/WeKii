@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import bsh.Interpreter
 import com.tencent.mm.pluginsdk.ui.chat.ChatFooter
 import dev.ujhhgtg.reflekt.reflekt
@@ -64,8 +65,20 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
 
     private const val TAG = "ScriptPlugin"
     private const val DISABLED_FLAG = "disabled.flag"
-
     private val SCRIPTS_DIR by lazy { (KnownPaths.moduleData / "plugins").createDirsSafe() }
+
+    private fun ensureNewScriptsDisabled() {
+        runCatching {
+            SCRIPTS_DIR.listDirectoryEntries()
+                .filter { it.isDirectory() }
+                .forEach { dir ->
+                    val main = dir / "main.java"
+                    val info = dir / "info.prop"
+                    val flag = dir / DISABLED_FLAG
+                    if (main.exists() && info.exists() && !flag.exists()) flag.writeText("")
+                }
+        }.onFailure { WeLogger.w(TAG, "failed to initialize script states", it) }
+    }
 
     val scripts = ConcurrentHashMap<String, JavaPlugin>()
     private val lifecycleLock = Any()
@@ -85,6 +98,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
     }
 
     override fun onEnable() {
+        ensureNewScriptsDisabled()
         val generation = synchronized(lifecycleLock) {
             lifecycleGeneration += 1
             lifecycleGeneration
@@ -176,6 +190,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
                                     if (enabled) R.string.java_script_status_enabled
                                     else R.string.java_script_status_disabled
                                 )
+                                val totalEnabled = isEnabled
                                 val versionText =
                                     entry.info.version?.let { stringResource(R.string.java_script_version, it) }
                                 val authorText =
@@ -195,7 +210,9 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
                                         authorText?.let { add(it) }
                                     }.joinToString(" · "),
                                     checked = enabled,
+                                    enabled = totalEnabled,
                                     onCheckedChange = { newState ->
+                                        if (!isEnabled) return@SwitchWidget
                                         if (setScriptEnabled(entry.dir, newState)) {
                                             enabled = newState
                                         }
