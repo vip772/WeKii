@@ -32,10 +32,7 @@ internal object MonetExtensionArchive {
             zip.entries().asSequence()
                 .filterNot { it.isDirectory || it.name == METADATA_NAME }
                 .forEach { entry ->
-                    val destination = stagingRoot.resolve(entry.name).normalize()
-                    if (destination != stagingRoot && !destination.startsWith(stagingRoot)) {
-                        throw IOException("illegal archive entry path: ${entry.name}")
-                    }
+                    val destination = safeResolveEntryPath(stagingRoot, entry.name)
                     Files.createDirectories(destination.parent)
                     zip.getInputStream(entry).use { input ->
                         Files.newOutputStream(destination).use(input::copyTo)
@@ -53,6 +50,19 @@ internal object MonetExtensionArchive {
     ): MonetExtensionMetadata {
         val metadata = installedDir.resolve(METADATA_NAME).readBytes()
         return decodeAndValidateMetadata(metadata, expectedApiVersion, expectedEntrypoint)
+    }
+
+    private fun safeResolveEntryPath(stagingRoot: java.nio.file.Path, entryName: String): java.nio.file.Path {
+        val entryPath = java.nio.file.Paths.get(entryName)
+        if (entryPath.isAbsolute) {
+            throw IOException("illegal archive entry path: $entryName")
+        }
+        val destination = stagingRoot.resolve(entryPath).normalize().toAbsolutePath()
+        val normalizedRoot = stagingRoot.normalize().toAbsolutePath()
+        if (!destination.startsWith(normalizedRoot)) {
+            throw IOException("illegal archive entry path: $entryName")
+        }
+        return destination
     }
 
     private fun decodeAndValidateMetadata(
