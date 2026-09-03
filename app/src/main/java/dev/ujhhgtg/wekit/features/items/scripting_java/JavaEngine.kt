@@ -277,6 +277,8 @@ object JavaEngine {
 
             setVariable("pluginPath", plugin.dir.absolutePathString())
             setVariable("pluginDir", plugin.dir.toFile())
+            setVariable("pluginDirFile", plugin.dir.toFile())
+            setVariable("PluginCallBack", LegacyPluginCallBack(plugin))
             setVariable("pluginId", plugin.name)
             setVariable("pluginName", plugin.info.name)
             setVariable("pluginAuthor", plugin.info.author)
@@ -1943,6 +1945,25 @@ object JavaEngine {
                     uploadMethod.invoke(getInstance.invoke(null), System.currentTimeMillis() / 1000, stepCount)
                 }.onFailure { WeLogger.e(TAG, "uploadDeviceStep failed", it) }
             })
+            setMethod(BshMethod("registerMessageMenu", arrayOf(BString, BString, Consumer::class.java)) { args ->
+                val title = args[0] as String
+                val callback = args[2] as Consumer<Any?>
+                val menuId = ("legacy_" + plugin.name + "_" + title).hashCode()
+                val provider = object : WeChatMessageContextMenuApi.IMenuItemsProvider {
+                    override fun getMenuItems() = listOf(WeChatMessageContextMenuApi.MenuItem(
+                        id = menuId, text = title, drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
+                        imageVector = MaterialSymbols.Outlined.Info, isSupported = { true },
+                        onClick = { _, _, msg -> callback.accept(msg) }
+                    ))
+                }
+                unregisterPluginMenu(plugin.name)
+                menuProviders[plugin.name] = provider
+                WeChatMessageContextMenuApi.addProvider(provider)
+                menuId
+            })
+            setMethod(BshMethod("removeMenu", arrayOf(any)) {
+                unregisterPluginMenu(plugin.name)
+            })
             setMethod(BshMethod("registerMenu", arrayOf(BString, BString, Consumer::class.java)) { args ->
                 val menuId = ("script_" + plugin.name + "_" + (args[0] as String)).hashCode()
                 val callback = args[2] as Consumer<Any?>
@@ -1985,6 +2006,20 @@ object JavaEngine {
                     return@BshMethod getTopMostActivity()
                 })
         }
+    }
+
+    private class LegacyPluginCallBack(private val plugin: JavaPlugin) {
+        // Legacy scripts instantiate PluginCallBack.HttpCallback/DownloadCallback.
+        // The actual request methods below accept these callbacks through reflection-safe Objects.
+        class HttpCallback {
+            open fun onSuccess(statusCode: Int, response: String?) {}
+            open fun onError(error: Exception?) {}
+        }
+        class DownloadCallback {
+            open fun onSuccess(file: File?) {}
+            open fun onError(error: Exception?) {}
+        }
+        override fun toString() = "PluginCallBack"
     }
 
     private fun pluginLog(plugin: JavaPlugin, message: String) {
