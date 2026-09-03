@@ -85,6 +85,7 @@ import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
+import dev.ujhhgtg.wekit.ui.utils.ChatInfoIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -100,12 +101,12 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
     override val defaultEnabled = false
     private const val MENU_ID = 777032
     private var selectedModelId by prefOption("group_chat_analysis_model_id", "")
-    private val blankIcon = ColorDrawable(Color.TRANSPARENT)
+    private val menuIcon = ChatInfoIcon
 
     override fun onEnable() = WeChatMessageContextMenuApi.addProvider(this)
     override fun onDisable() = WeChatMessageContextMenuApi.removeProvider(this)
     override fun getMenuItems() = listOf(WeChatMessageContextMenuApi.MenuItem(
-        id = MENU_ID, text = localizedChatString(R.string.group_chat_analysis_menu), drawable = blankIcon,
+        id = MENU_ID, text = localizedChatString(R.string.group_chat_analysis_menu), drawable = menuIcon,
         imageVector = MaterialSymbols.Outlined.Info,
         isSupported = { it.talker.endsWith("@chatroom") || it.talker.endsWith("@im.chatroom") },
         multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
