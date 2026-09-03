@@ -1,6 +1,6 @@
 # Java BeanShell 插件格式
 
-将插件目录复制到 `/sdcard/WeKii/plugins_java/<id>/`，目录至少包含：
+将插件目录复制到 `/storage/emulated/0/Android/media/<微信包名>/<模块标签>/plugins/<id>/`，目录至少包含：
 
 - `info.prop`：插件元数据；
 - `main.java`：BeanShell 脚本。

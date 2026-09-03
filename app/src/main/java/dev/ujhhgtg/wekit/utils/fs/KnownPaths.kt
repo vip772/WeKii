@@ -13,8 +13,9 @@ object KnownPaths {
         Environment.getExternalStorageDirectory().asPath
     }
 
+    /** Public user data directory: /Android/media/<host package>/<module tag>/ */
     val moduleData by lazy {
-        (internalStorage / "Android" / "data" /
+        (internalStorage / "Android" / "media" /
                 runCatching { HostInfo.packageName }.getOrDefault(PackageNames.WECHAT) /
                 BuildConfig.TAG).createDirsSafe()
     }
