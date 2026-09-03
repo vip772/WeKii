@@ -28,6 +28,8 @@ import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import android.graphics.drawable.ColorDrawable
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Info
 import dev.ujhhgtg.wekit.features.api.ui.WeMomentsApi
 import dev.ujhhgtg.wekit.extensions.ScriptDepsPack
 import dev.ujhhgtg.wekit.utils.AudioUtils
@@ -1940,7 +1942,7 @@ object JavaEngine {
                             id = menuId,
                             text = args[1] as String,
                             drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
-                            imageVector = com.composables.icons.materialsymbols.MaterialSymbols.Outlined.Info,
+                            imageVector = MaterialSymbols.Outlined.Info,
                             isSupported = { true },
                             onClick = { view, context, msg ->
                                 runCatching { callback.accept(arrayOf(view, context, msg)) }
