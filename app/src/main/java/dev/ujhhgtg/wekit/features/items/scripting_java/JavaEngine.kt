@@ -250,17 +250,13 @@ object JavaEngine {
         nameSpace.apply {
             // ===== Script API type imports =====
             // BeanShell has its own namespace and does not inherit imports from this host file.
-            importClass(MsgInfoBean::class.java)
-            importClass(ContactLabelBean::class.java)
-            importClass(FriendInfo::class.java)
-            importClass(GroupInfo::class.java)
-            importClass(me.hd.wauxv.data.bean.PayMsgBean::class.java)
-            importPackage(WeApi::class.java.getPackage())
-            importPackage(WeMessageApi::class.java.getPackage())
-            importPackage(WeContactApi::class.java.getPackage())
-            importPackage(WeGroupApi::class.java.getPackage())
-            importPackage(WeDatabaseApi::class.java.getPackage())
-            importPackage(WeChatMessageContextMenuApi::class.java.getPackage())
+            importClass("me.hd.wauxv.data.bean.MsgInfoBean")
+            importClass("me.hd.wauxv.data.bean.ContactLabelBean")
+            importClass("me.hd.wauxv.data.bean.info.FriendInfo")
+            importClass("me.hd.wauxv.data.bean.info.GroupInfo")
+            importClass("me.hd.wauxv.data.bean.PayMsgBean")
+            importPackage("dev.ujhhgtg.wekit.features.api.core")
+            importPackage("dev.ujhhgtg.wekit.features.api.ui")
             // ===== Host Info =====
             setVariable("hostContext", HostInfo.application)
             setVariable("hostVerName", HostInfo.versionName)
