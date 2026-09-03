@@ -2,11 +2,9 @@ package dev.ujhhgtg.wekit.features.items.chat
 
 import android.graphics.Color
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import java.io.File
-import java.net.URL
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.WindowManager
@@ -79,6 +77,9 @@ import dev.ujhhgtg.wekit.agent.model.*
 import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeApi
+import dev.ujhhgtg.reflekt.reflekt
+import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
+import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
@@ -95,6 +96,19 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
+    private val notificationAvatarMethod by dexMethod {
+        matcher {
+            paramTypes("android.content.Context", "java.lang.String", "java.lang.String")
+            returnType("android.graphics.Bitmap")
+            usingEqStrings("MicroMsg.NotificationAvatar", "wcf://avatar/")
+        }
+    }
+    private val notificationAvatarLoader by lazy {
+        notificationAvatarMethod.method.declaringClass.reflekt()
+            .firstConstructor { parameters(android.content.Context::class) }
+            .newInstance(HostInfo.application)
+    }
+
     override val technicalId = "群聊分析"
     override val nameRes = R.string.feature_group_chat_analysis_name
     override val categoryIds = listOf(FeatureCategoryIds.CHAT)
@@ -671,11 +685,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             val avatarLeft = 132f
             val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 188, 150) }
             canvas.drawCircle(avatarLeft + 22f, top + 39f, 22f, avatarPaint)
-            val avatarUrl = member?.avatarUrl.orEmpty()
-            if (avatarUrl.isNotBlank()) {
-                runCatching {
-                    val avatarBitmap = URL(avatarUrl).openStream().use { BitmapFactory.decodeStream(it) }
-                    if (avatarBitmap != null) {
+            runCatching {
+                val avatarBitmap = notificationAvatarMethod.method.invoke(notificationAvatarLoader, HostInfo.application, entry.senderId, "") as? Bitmap
+                if (avatarBitmap != null) {
                         val sourceSize = minOf(avatarBitmap.width, avatarBitmap.height)
                         val source = android.graphics.Rect(
                             (avatarBitmap.width - sourceSize) / 2,
@@ -689,7 +701,6 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         canvas.drawBitmap(avatarBitmap, source, target, null)
                         canvas.restore()
                         avatarBitmap.recycle()
-                    }
                 }
             }
             canvas.drawText(name, avatarLeft + 58f, top + 45f, namePaint)
