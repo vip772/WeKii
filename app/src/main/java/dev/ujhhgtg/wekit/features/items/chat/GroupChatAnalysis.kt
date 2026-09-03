@@ -77,9 +77,6 @@ import dev.ujhhgtg.wekit.agent.model.*
 import dev.ujhhgtg.wekit.agent.model.local.LocalLlamaModels
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeApi
-import dev.ujhhgtg.reflekt.reflekt
-import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
-import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
@@ -96,19 +93,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
-    private val notificationAvatarMethod by dexMethod {
-        matcher {
-            paramTypes("android.content.Context", "java.lang.String", "java.lang.String")
-            returnType("android.graphics.Bitmap")
-            usingEqStrings("MicroMsg.NotificationAvatar", "wcf://avatar/")
-        }
-    }
-    private val notificationAvatarLoader by lazy {
-        notificationAvatarMethod.method.declaringClass.reflekt()
-            .firstConstructor { parameters(android.content.Context::class) }
-            .newInstance(HostInfo.application)
-    }
-
     override val technicalId = "群聊分析"
     override val nameRes = R.string.feature_group_chat_analysis_name
     override val categoryIds = listOf(FeatureCategoryIds.CHAT)
@@ -163,7 +147,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             }
             LaunchedEffect(Unit) { reloadModels() }
             LaunchedEffect(Unit) {
-                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, AnalysisRange.ALL).stats } }
+                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.loadFastStats(message.talker) } }
                     .onSuccess { stats = it }.onFailure { error = it.message }
             }
 
@@ -682,30 +666,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
             canvas.drawText("${index + 1}", 88f, top + 47f, badgeText)
             val member = members.firstOrNull { it.wxId == entry.senderId }
             val name = member?.displayName?.ifBlank { member.nickname }?.ifBlank { "未知成员" } ?: if (entry.senderId == WeApi.selfWxId) "我" else "未知成员"
-            val avatarLeft = 132f
-            val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 188, 150) }
-            canvas.drawCircle(avatarLeft + 22f, top + 39f, 22f, avatarPaint)
-            runCatching {
-                val avatarBitmap = notificationAvatarMethod.method.invoke(notificationAvatarLoader, HostInfo.application, entry.senderId, "") as? Bitmap
-                if (avatarBitmap != null) {
-                        val sourceSize = minOf(avatarBitmap.width, avatarBitmap.height)
-                        val source = android.graphics.Rect(
-                            (avatarBitmap.width - sourceSize) / 2,
-                            (avatarBitmap.height - sourceSize) / 2,
-                            (avatarBitmap.width + sourceSize) / 2,
-                            (avatarBitmap.height + sourceSize) / 2,
-                        )
-                        val target = android.graphics.RectF(avatarLeft, top + 17f, avatarLeft + 44f, top + 61f)
-                        canvas.save()
-                        canvas.clipPath(android.graphics.Path().apply { addCircle(avatarLeft + 22f, top + 39f, 22f, android.graphics.Path.Direction.CW) })
-                        canvas.drawBitmap(avatarBitmap, source, target, null)
-                        canvas.restore()
-                        avatarBitmap.recycle()
-                }
-            }
-            canvas.drawText(name, avatarLeft + 58f, top + 45f, namePaint)
+            canvas.drawText(name, 135f, top + 45f, namePaint)
             canvas.drawText("${entry.count} 条", width - 76f, top + 45f, countPaint)
-            val left = avatarLeft + 58f
+            val left = 135f
             val right = width - 76f
             val y = top + 70f
             canvas.drawLine(left, y, right, y, trackPaint)
@@ -878,6 +841,29 @@ private data class GroupAnalysisStats(
 
 private object GroupChatAnalysisEngine {
     private val groupSenderRegex = Regex("""^([^\n:]+):\n(.*)$""", setOf(RegexOption.DOT_MATCHES_ALL))
+
+    suspend fun loadFastStats(talker: String): GroupAnalysisStats {
+        val now = Calendar.getInstance()
+        val todayStart = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        fun scalar(sql: String, args: Array<Any>): Int = runCatching {
+            WeDatabaseApi.rawQuery(sql, args).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+        }.getOrDefault(0)
+        val history = scalar("SELECT COUNT(*) FROM message WHERE talker=?", arrayOf(talker))
+        val today = scalar("SELECT COUNT(*) FROM message WHERE talker=? AND createTime>=?", arrayOf(talker, todayStart))
+        val todayUsers = scalar("SELECT COUNT(DISTINCT CASE WHEN isSend!=0 THEN ? ELSE substr(content,1,instr(content,':\n')-1) END) FROM message WHERE talker=? AND createTime>=?", arrayOf(WeApi.selfWxId, talker, todayStart))
+        val typeStats = linkedMapOf<String, Int>()
+        WeDatabaseApi.rawQuery("SELECT type, COUNT(*) FROM message WHERE talker=? GROUP BY type", arrayOf(talker)).use { c ->
+            while (c.moveToNext()) typeStats[messageTypeName(c.getInt(0))] = c.getInt(1)
+        }
+        return GroupAnalysisStats(
+            totalMessages = history, historyTotalMessages = history, todayMessages = today, todayActiveUsers = todayUsers,
+            textMessages = typeStats["文本"] ?: 0, activeUsers = 0, atMeMessages = 0, ranking = emptyList(),
+            earlyBird = 0, nightOwl = 0, laugh = 0, question = 0, exclamation = 0, speechless = 0,
+            tiny = 0, short = 0, medium = 0, long = 0, typeStats = typeStats,
+        )
+    }
 
     suspend fun load(talker: String, range: AnalysisRange): LoadedAnalysis {
         val now = Calendar.getInstance()
