@@ -3,6 +3,8 @@ package dev.ujhhgtg.wekit.extensions
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 import java.util.zip.ZipFile
 
 @Serializable
@@ -23,16 +25,17 @@ internal object MonetExtensionArchive {
         expectedEntrypoint: String,
     ): MonetExtensionMetadata {
         stagingDir.mkdirs()
+        val stagingRoot = stagingDir.toPath().toAbsolutePath().normalize()
         return ZipFile(archive).use { zip ->
             val metadataBytes = zip.getInputStream(zip.getEntry(METADATA_NAME)).use { it.readBytes() }
             val metadata = decodeAndValidateMetadata(metadataBytes, expectedApiVersion, expectedEntrypoint)
             zip.entries().asSequence()
                 .filterNot { it.isDirectory || it.name == METADATA_NAME }
                 .forEach { entry ->
-                    val destination = File(stagingDir, entry.name)
-                    destination.parentFile?.mkdirs()
+                    val destination = safeResolveEntryPath(stagingRoot, entry.name)
+                    Files.createDirectories(destination.parent)
                     zip.getInputStream(entry).use { input ->
-                        destination.outputStream().use(input::copyTo)
+                        Files.newOutputStream(destination).use(input::copyTo)
                     }
                 }
             stagingDir.resolve(METADATA_NAME).writeBytes(metadataBytes)
@@ -47,6 +50,19 @@ internal object MonetExtensionArchive {
     ): MonetExtensionMetadata {
         val metadata = installedDir.resolve(METADATA_NAME).readBytes()
         return decodeAndValidateMetadata(metadata, expectedApiVersion, expectedEntrypoint)
+    }
+
+    private fun safeResolveEntryPath(stagingRoot: java.nio.file.Path, entryName: String): java.nio.file.Path {
+        val entryPath = java.nio.file.Paths.get(entryName)
+        if (entryPath.isAbsolute) {
+            throw IOException("illegal archive entry path: $entryName")
+        }
+        val destination = stagingRoot.resolve(entryPath).normalize().toAbsolutePath()
+        val normalizedRoot = stagingRoot.normalize().toAbsolutePath()
+        if (!destination.startsWith(normalizedRoot)) {
+            throw IOException("illegal archive entry path: $entryName")
+        }
+        return destination
     }
 
     private fun decodeAndValidateMetadata(

@@ -1,8 +1,5 @@
 package dev.ujhhgtg.wekit.features.items.chat
 
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.view.View
 import androidx.compose.foundation.clickable
@@ -41,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
-import com.composables.icons.materialsymbols.outlined.Info
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
@@ -53,6 +49,8 @@ import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
+import dev.ujhhgtg.wekit.ui.utils.MofangVoiceIcon
+import com.composables.icons.materialsymbols.outlined.Info
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.android.showToast
 import dev.ujhhgtg.wekit.utils.coerceToInt
@@ -80,8 +78,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     private var selectedVoiceId by prefOption("mofang_voice_selected_id", "")
     private var selectedVoiceName by prefOption("mofang_voice_selected_name", "")
     private var selectedVoiceIsCloned by prefOption("mofang_voice_selected_is_cloned", false)
-    private val blankIcon = ColorDrawable(Color.TRANSPARENT)
-
+    private val menuIcon = MofangVoiceIcon
     override fun onEnable() = WeChatMessageContextMenuApi.addProvider(this)
     override fun onDisable() = WeChatMessageContextMenuApi.removeProvider(this)
 
@@ -89,12 +86,9 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
         WeChatMessageContextMenuApi.MenuItem(
             id = MENU_ID,
             text = localizedChatString(R.string.mofang_voice_menu),
-            drawable = BitmapDrawable(
-                WeChatMessageContextMenuApi::class.java.classLoader
-                    ?.getResourceAsStream("res/drawable-nodpi/ic_mofang_voice.png"),
-            ),
+            drawable = menuIcon,
             imageVector = MaterialSymbols.Outlined.Info,
-            isSupported = { it.typeCode == 1 && it.content.isNotBlank() },
+            isSupported = { true },
             multiSelect = WeChatMessageContextMenuApi.MultiSelectSupport.Unsupported,
         ) { view, chattingContext, message ->
             showGeneratorDialog(view, chattingContext, message)
@@ -108,7 +102,7 @@ object MofangVoice : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProv
     ) {
         showComposeDialog(chattingContext.activity) {
             val scope = rememberCoroutineScope()
-            var text by remember { mutableStateOf(message.actualContent) }
+            var text by remember { mutableStateOf(message.actualContent.takeIf { message.typeCode == 1 }.orEmpty()) }
             var builtInVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
             var clonedVoices by remember { mutableStateOf(emptyList<MofangVoiceApi.Voice>()) }
             val rememberedVoice = remember {
