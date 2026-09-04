@@ -215,7 +215,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                 busy = true; error = null; report = ""
                                 scope.launch { runCatching {
                                     val loaded = withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) }
-                                    stats = loaded.stats
+                                    // 生成报告只使用本次快照，不能覆盖核心指标区的首次加载数据。
                                     GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
                                 }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
                             },
@@ -853,7 +853,7 @@ private object GroupChatAnalysisEngine {
         }.getOrDefault(0)
         val history = scalar("SELECT COUNT(*) FROM message WHERE talker=?", arrayOf(talker))
         val today = scalar("SELECT COUNT(*) FROM message WHERE talker=? AND createTime>=?", arrayOf(talker, todayStart))
-        val todayUsers = scalar("SELECT COUNT(DISTINCT CASE WHEN isSend!=0 THEN ? ELSE substr(content,1,instr(content,':\n')-1) END) FROM message WHERE talker=? AND createTime>=?", arrayOf(WeApi.selfWxId, talker, todayStart))
+        val todayUsers = scalar("SELECT COUNT(DISTINCT CASE WHEN isSend!=0 THEN ? ELSE CASE WHEN instr(content, char(10))>0 THEN substr(content,1,instr(content, char(10))-1) ELSE NULL END END) FROM message WHERE talker=? AND createTime>=?", arrayOf(WeApi.selfWxId, talker, todayStart))
         val typeStats = linkedMapOf<String, Int>()
         WeDatabaseApi.rawQuery("SELECT type, COUNT(*) FROM message WHERE talker=? GROUP BY type", arrayOf(talker)).use { c ->
             while (c.moveToNext()) typeStats[messageTypeName(c.getInt(0))] = c.getInt(1)
