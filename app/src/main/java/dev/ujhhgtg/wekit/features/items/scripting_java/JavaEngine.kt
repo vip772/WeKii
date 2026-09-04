@@ -312,9 +312,9 @@ object JavaEngine {
             importClass("me.hd.wauxv.data.bean.info.FriendInfo")
             importClass("me.hd.wauxv.data.bean.info.GroupInfo")
             importClass("me.hd.wauxv.data.bean.PayMsgBean")
-            importClass("MODULE.dev.ujhhgtg.wekit.features.items.scripting_java.PluginCallBack")
-            importClass("MODULE.dev.ujhhgtg.wekit.features.items.scripting_java.PluginCallBack.HttpCallback")
-            importClass("MODULE.dev.ujhhgtg.wekit.features.items.scripting_java.PluginCallBack.DownloadCallback")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.HttpCallback")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.DownloadCallback")
             importPackage("dev.ujhhgtg.wekit.features.api.core")
             importPackage("dev.ujhhgtg.wekit.features.api.ui")
             // ===== Host Info =====
