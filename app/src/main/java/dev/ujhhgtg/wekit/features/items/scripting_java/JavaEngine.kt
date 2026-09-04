@@ -312,9 +312,8 @@ object JavaEngine {
             importClass("me.hd.wauxv.data.bean.info.FriendInfo")
             importClass("me.hd.wauxv.data.bean.info.GroupInfo")
             importClass("me.hd.wauxv.data.bean.PayMsgBean")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.HttpCallback")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.DownloadCallback")
+            importClass("me.hd.wauxv.plugin.api.callback.PluginCallBack")
+            importPackage("me.hd.wauxv.plugin.api.callback")
             importPackage("dev.ujhhgtg.wekit.features.api.core")
             importPackage("dev.ujhhgtg.wekit.features.api.ui")
             // ===== Host Info =====
@@ -1687,6 +1686,7 @@ object JavaEngine {
             }
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[3]; val url = a[0] as String; val headers = a[1] as? Map<String, String>; val timeout = a[2] as Long
+                pluginLog(plugin, "LEGACY GET METHOD ENTERED callback=${callback?.javaClass?.name}")
                 thread { runCatching {
                     pluginLog(plugin, "HTTP GET start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
