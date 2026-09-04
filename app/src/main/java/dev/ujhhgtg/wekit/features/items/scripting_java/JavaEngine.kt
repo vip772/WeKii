@@ -306,13 +306,27 @@ object JavaEngine {
     fun initNameSpace(nameSpace: NameSpace, plugin: JavaPlugin) {
         nameSpace.apply {
             // ===== Script API type imports =====
+            importClass("java.lang.reflect.Method")
+            importClass("java.lang.reflect.Field")
+            importClass("java.lang.reflect.Constructor")
+            importClass("java.lang.reflect.Member")
+            importClass("java.lang.reflect.InvocationTargetException")
+            importClass("java.util.Map")
+            importClass("java.util.List")
+            importClass("java.util.Set")
+            importClass("java.util.ArrayList")
+            importClass("java.util.HashMap")
             // BeanShell has its own namespace and does not inherit imports from this host file.
             importClass("me.hd.wauxv.data.bean.MsgInfoBean")
             importClass("me.hd.wauxv.data.bean.ContactLabelBean")
             importClass("me.hd.wauxv.data.bean.info.FriendInfo")
             importClass("me.hd.wauxv.data.bean.info.GroupInfo")
             importClass("me.hd.wauxv.data.bean.PayMsgBean")
-            importClass("me.hd.wauxv.plugin.api.callback.PluginCallBack")
+            // pl-compatible public callback API. Use the module route explicitly so
+            // BeanShell resolves the class from the same loader that owns this APK.
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.HttpCallback")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.DownloadCallback")
             importPackage("me.hd.wauxv.plugin.api.callback")
             importPackage("dev.ujhhgtg.wekit.features.api.core")
             importPackage("dev.ujhhgtg.wekit.features.api.ui")
