@@ -1620,7 +1620,7 @@ object JavaEngine {
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[3]; val url = a[0] as String; val headers = a[1] as? Map<String, String>; val timeout = a[2] as Long
                 thread { runCatching {
-                    pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} path=${path} headers=${safeHeaders(headers)}")
+                    pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
