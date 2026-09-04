@@ -84,18 +84,46 @@ object JavaEngine {
 
     private const val TAG = "JavaEngine"
     private const val WA_MODULE_VER = 1418
+    private val callbackAliases = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, String>>()
+
+    private fun findScriptMethod(plugin: JavaPlugin, callbackName: String, signatures: Array<Class<*>>): BshMethod? {
+        val namespace = plugin.interpreter.nameSpace
+        val direct = namespace.getMethod(callbackName, signatures)
+            ?: namespace.getMethod(callbackName, arrayOf(any))
+        if (direct != null) return direct
+        val alias = callbackAliases[plugin.name]?.get(callbackName) ?: return null
+        return namespace.getMethod(alias, signatures)
+            ?: namespace.getMethod(alias, arrayOf(any))
+    }
+
+    private fun setCallbackAlias(plugin: JavaPlugin, callbackName: String, methodName: String) {
+        val allowed = setOf(
+            "onLoad", "onUnload", "openSettings", "onClickSendBtn", "onLongClickSendBtn",
+            "onHandleMsg", "onImageDownload", "onVideoDownload", "onFinderMediaDownload",
+            "onProtobufPacket", "onMemberChange", "onNewFriend"
+        )
+        require(callbackName in allowed) { "unsupported callback: $callbackName" }
+        require(methodName.isNotBlank()) { "callback method name is empty" }
+        callbackAliases.getOrPut(plugin.name) { java.util.concurrent.ConcurrentHashMap() }[callbackName] = methodName
+        pluginLog(plugin, "callback alias registered: $callbackName -> $methodName")
+    }
+
+    private fun clearCallbackAliases(plugin: JavaPlugin) {
+        callbackAliases.remove(plugin.name)
+    }
 
     fun executeAllOnLoad(scripts: Map<String, JavaPlugin>) {
         scripts.values.forEach { plugin ->
             BypassScriptsDrm.registerInterpreter(plugin.interpreter)
             try {
+                clearCallbackAliases(plugin)
                 initPlugin(plugin)
                 pluginLog(plugin, "evaluating plugin")
                 plugin.interpreter.eval(plugin.content)
                 pluginLog(plugin, "plugin evaluated successfully")
                 pluginLog(plugin, "namespace methods: " + plugin.interpreter.nameSpace.getMethods().joinToString { it.name })
 
-                val bshMethod = plugin.interpreter.nameSpace.getMethod("onLoad", emptyArray())
+                val bshMethod = findScriptMethod(plugin, "onLoad", emptyArray())
                 bshMethod?.apply {
                     invoke(arrayOf(), plugin.interpreter)
                     pluginLog(plugin, "onLoad executed")
@@ -112,7 +140,7 @@ object JavaEngine {
         unregisterAllPluginMenus()
         scripts.values.forEach { plugin ->
             try {
-                val bshMethod = plugin.interpreter.nameSpace.getMethod("onUnload", emptyArray())
+                val bshMethod = findScriptMethod(plugin, "onUnload", emptyArray())
                 bshMethod?.apply {
                     invoke(emptyArray(), plugin.interpreter)
                     WeLogger.i(TAG, "onUnload executed for script ${plugin.name}")
@@ -120,6 +148,7 @@ object JavaEngine {
             } catch (e: Exception) {
                 WeLogger.e(TAG, "onUnload execution failed for script ${plugin.name}", e)
             } finally {
+                clearCallbackAliases(plugin)
                 BypassScriptsDrm.unregisterInterpreter(plugin.interpreter)
             }
         }
@@ -131,10 +160,7 @@ object JavaEngine {
     ) {
         scripts.values.forEach { plugin ->
             try {
-                val bshMethod = plugin.interpreter.nameSpace.getMethod(
-                    "onHandleMsg",
-                    arrayOf(MsgInfoBean::class.java)
-                )
+                val bshMethod = findScriptMethod(plugin, "onHandleMsg", arrayOf(MsgInfoBean::class.java))
                 bshMethod?.apply {
                     invoke(arrayOf(msgBean), plugin.interpreter)
                     WeLogger.i(TAG, "onHandleMsg executed for script ${plugin.name}")
@@ -152,10 +178,7 @@ object JavaEngine {
     ) {
         scripts.values.forEach { plugin ->
             try {
-                val bshMethod = plugin.interpreter.nameSpace.getMethod(
-                    "onClickSendBtn",
-                    arrayOf(BString)
-                )
+                val bshMethod = findScriptMethod(plugin, "onClickSendBtn", arrayOf(BString))
                 bshMethod?.apply {
                     val ifIntercept = invoke(arrayOf(text), plugin.interpreter)
                     WeLogger.i(TAG, "onClickSendBtn executed for script ${plugin.name}; ifIntercept=${ifIntercept}")
@@ -165,6 +188,25 @@ object JavaEngine {
                 }
             } catch (e: Exception) {
                 WeLogger.e(TAG, "onClickSendBtn execution failed for script ${plugin.name}", e)
+            }
+        }
+    }
+
+    fun executeAllOnLongClickSendBtn(
+        scripts: Map<String, JavaPlugin>,
+        param: HookParam,
+        text: String
+    ) {
+        scripts.values.forEach { plugin ->
+            try {
+                val bshMethod = findScriptMethod(plugin, "onLongClickSendBtn", arrayOf(BString))
+                bshMethod?.apply {
+                    val ifIntercept = invoke(arrayOf(text), plugin.interpreter)
+                    WeLogger.i(TAG, "onLongClickSendBtn executed for script ${plugin.name}; ifIntercept=${ifIntercept}")
+                    if (ifIntercept == true) param.result = null
+                }
+            } catch (e: Exception) {
+                WeLogger.e(TAG, "onLongClickSendBtn execution failed for script ${plugin.name}", e)
             }
         }
     }
@@ -284,6 +326,16 @@ object JavaEngine {
             // ===== Compat Info =====
 
             setVariable("moduleVer", WA_MODULE_VER)
+
+            setMethod(BshMethod("useCallback", arrayOf(BString, BString)) { a ->
+                setCallbackAlias(plugin, a[0] as String, a[1] as String); null
+            })
+            setMethod(BshMethod("useOnLoad", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onLoad", a[0] as String); null })
+            setMethod(BshMethod("useOnUnload", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onUnload", a[0] as String); null })
+            setMethod(BshMethod("useOpenSettings", arrayOf(BString)) { a -> setCallbackAlias(plugin, "openSettings", a[0] as String); null })
+            setMethod(BshMethod("useOnClickSendBtn", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onClickSendBtn", a[0] as String); null })
+            setMethod(BshMethod("useOnLongClickSendBtn", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onLongClickSendBtn", a[0] as String); null })
+            setMethod(BshMethod("useOnHandleMsg", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onHandleMsg", a[0] as String); null })
 
             // ===== FileSystem Info =====
 
@@ -1644,8 +1696,18 @@ object JavaEngine {
                 val callback = a[4]; val url = a[0] as String; val params = a[1]; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
                 thread { runCatching {
                     pluginLog(plugin, "HTTP POST start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
-                    val json = if (params is org.json.JSONObject) params.toString() else if (params is Map<*, *>) org.json.JSONObject(params).toString() else params?.toString() ?: "{}"
-                    val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
+                    val contentType = headers?.entries?.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value.orEmpty()
+                    val body = if (contentType.substringBefore(';').trim().equals("application/x-www-form-urlencoded", ignoreCase = true)) {
+                        val form = okhttp3.FormBody.Builder()
+                        when (params) {
+                            is Map<*, *> -> params.forEach { (key, value) -> if (key != null) form.add(key.toString(), value?.toString() ?: "") }
+                            is org.json.JSONObject -> params.keys().forEach { key -> form.add(key, params.optString(key)) }
+                        }
+                        form.build()
+                    } else {
+                        val json = if (params is org.json.JSONObject) params.toString() else if (params is Map<*, *>) org.json.JSONObject(params).toString() else params?.toString() ?: "{}"
+                        json.toRequestBody("application/json; charset=utf-8".toMediaType())
+                    }
                     val req = okhttp3.Request.Builder().url(url).post(body).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
