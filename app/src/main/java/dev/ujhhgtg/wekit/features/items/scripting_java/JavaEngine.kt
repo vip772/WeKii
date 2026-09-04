@@ -28,7 +28,6 @@ import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import android.graphics.drawable.ColorDrawable
-import android.content.Context
 import androidx.compose.material3.Text
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.TextButton
@@ -251,6 +250,12 @@ object JavaEngine {
         initNameSpace(nameSpace, plugin)
     }
 
+    private fun readLe16(raf: java.io.RandomAccessFile): Int {
+        val a = raf.read(); val b = raf.read(); return a or (b shl 8)
+    }
+    private fun readLe32(raf: java.io.RandomAccessFile): Int {
+        val a = raf.read(); val b = raf.read(); val c = raf.read(); val d = raf.read(); return a or (b shl 8) or (c shl 16) or (d shl 24)
+    }
     fun initNameSpace(nameSpace: NameSpace, plugin: JavaPlugin) {
         nameSpace.apply {
             // ===== Script API type imports =====
@@ -296,6 +301,33 @@ object JavaEngine {
             setVariable("engineVerCode", BuildConfig.VERSION_CODE)
             setVariable("engineVerName", BuildConfig.VERSION_NAME)
 
+            setMethod(BshMethod("pcmToSilk", arrayOf(BString, BString, int, int, int)) { a ->
+                val source = a[0] as String
+                val target = a[1] as String
+                runCatching { AudioUtils.anyToSilk(source, target) }.getOrDefault(false)
+            })
+            setMethod(BshMethod("readWav", arrayOf(BString)) { a ->
+                val file = File(a[0] as String)
+                java.io.RandomAccessFile(file, "r").use { raf ->
+                    val header = ByteArray(12); raf.readFully(header)
+                    require(String(header, 0, 4, Charsets.US_ASCII) == "RIFF" && String(header, 8, 4, Charsets.US_ASCII) == "WAVE") { "invalid WAV file" }
+                    var sampleRate = 0; var channels = 0; var bits = 0; var dataOffset = -1L; var dataSize = 0L
+                    while (raf.filePointer + 8 <= raf.length()) {
+                        val id = ByteArray(4); raf.readFully(id)
+                        val sizeBytes = ByteArray(4); raf.readFully(sizeBytes)
+                        val size = ((sizeBytes[0].toLong() and 255) or ((sizeBytes[1].toLong() and 255) shl 8) or ((sizeBytes[2].toLong() and 255) shl 16) or ((sizeBytes[3].toLong() and 255) shl 24))
+                        val chunk = String(id, Charsets.US_ASCII)
+                        if (chunk == "fmt ") {
+                            raf.skipBytes(2); channels = readLe16(raf); sampleRate = readLe32(raf); raf.skipBytes(6); bits = readLe16(raf)
+                            if (size > 16) raf.seek((raf.filePointer + size - 16).coerceAtMost(raf.length()))
+                        } else if (chunk == "data") { dataOffset = raf.filePointer; dataSize = size; break } else raf.seek((raf.filePointer + size + (size and 1)).coerceAtMost(raf.length()))
+                    }
+                    require(sampleRate > 0 && channels > 0 && dataOffset >= 0) { "invalid WAV format" }
+                    require(bits == 16) { "only 16-bit WAV is supported" }
+                    val duration = if (sampleRate > 0 && channels > 0) dataSize * 1000L / (sampleRate.toLong() * channels * 2L) else 0L
+                    arrayOf(sampleRate, channels, duration, dataOffset)
+                }
+            })
             // ===== Audio Utils =====
 
             setMethod(
@@ -1537,6 +1569,58 @@ object JavaEngine {
                 }
             })
 
+            // Legacy callback adapters: old plugins pass PluginCallBack callbacks instead of Consumer.
+            fun invokeLegacy(target: Any?, name: String, signatures: Array<Class<*>>, values: Array<Any?>) {
+                if (target == null) return
+                runCatching {
+                    val method = target.javaClass.methods.firstOrNull { it.name == name && it.parameterTypes.contentEquals(signatures) }
+                    method?.invoke(target, *values)
+                }
+            }
+            fun legacyHttpCallback(callback: Any?, status: Int, response: String?, error: Exception?) {
+                if (error != null) invokeLegacy(callback, "onError", arrayOf(Exception::class.java), arrayOf(error))
+                else invokeLegacy(callback, "onSuccess", arrayOf(Integer.TYPE, String::class.java), arrayOf(status, response))
+            }
+            fun legacyDownloadCallback(callback: Any?, file: File?, error: Exception?) {
+                if (error != null) {
+                    invokeLegacy(callback, "onError", arrayOf(Exception::class.java), arrayOf(error))
+                } else {
+                    invokeLegacy(callback, "onSuccess", arrayOf(File::class.java), arrayOf(file))
+                }
+            }
+            fun legacyProgress(callback: Any?, current: Long, total: Long) {
+                invokeLegacy(callback, "onProgress", arrayOf(java.lang.Long.TYPE, java.lang.Long.TYPE), arrayOf(current, total))
+            }
+            setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
+                val callback = a[3]; val url = a[0] as String; val headers = a[1] as? Map<String, String>; val timeout = a[2] as Long
+                thread { runCatching {
+                    val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
+                    val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
+                    client.newCall(req).execute().use { r -> legacyHttpCallback(callback, r.code, r.body.string(), null) }
+                }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
+            })
+            setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, any)) { a ->
+                val callback = a[4]; val url = a[0] as String; val params = a[1] as? Map<String, String>; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
+                thread { runCatching {
+                    val form = okhttp3.FormBody.Builder(); params?.forEach { (k,v) -> form.add(k,v) }
+                    val req = okhttp3.Request.Builder().url(url).post(form.build()).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
+                    val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
+                    client.newCall(req).execute().use { r -> legacyHttpCallback(callback, r.code, r.body.string(), null) }
+                }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
+            })
+            setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
+                val callback = a[4]; val url = a[0] as String; val path = a[1] as String; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
+                thread { runCatching {
+                    val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
+                    val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
+                    client.newCall(req).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; val file = File(path); file.parentFile?.mkdirs()
+                        r.body.byteStream().use { input -> file.outputStream().use { output ->
+                            val buffer = ByteArray(8192); var current = 0L; val total = r.body.contentLength(); var n: Int
+                            while (input.read(buffer).also { n = it } >= 0) { if (n == 0) continue; output.write(buffer, 0, n); current += n; legacyProgress(callback, current, total) }
+                        } }
+                        legacyDownloadCallback(callback, file, null) }
+                }.onFailure { legacyDownloadCallback(callback, null, it as? Exception ?: Exception(it)) } }
+            })
             // === HTTP (OkHttp) ===
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, Consumer::class.java)) {
                 val url = it[0] as String
@@ -2025,20 +2109,6 @@ object JavaEngine {
                     return@BshMethod getTopMostActivity()
                 })
         }
-    }
-
-    private class LegacyPluginCallBack(private val plugin: JavaPlugin) {
-        // Legacy scripts instantiate PluginCallBack.HttpCallback/DownloadCallback.
-        // The actual request methods below accept these callbacks through reflection-safe Objects.
-        class HttpCallback {
-            open fun onSuccess(statusCode: Int, response: String?) {}
-            open fun onError(error: Exception?) {}
-        }
-        class DownloadCallback {
-            open fun onSuccess(file: File?) {}
-            open fun onError(error: Exception?) {}
-        }
-        override fun toString() = "PluginCallBack"
     }
 
     private fun pluginLog(plugin: JavaPlugin, message: String) {
