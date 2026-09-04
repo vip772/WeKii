@@ -77,6 +77,8 @@ import kotlin.io.path.deleteExisting
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.nameWithoutExtension
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 object JavaEngine {
 
