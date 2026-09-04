@@ -290,16 +290,16 @@ object JavaEngine {
             setVariable("cacheDir", KnownPaths.moduleCache.absolutePathString())
             setVariable("cacheDirFile", KnownPaths.moduleCache.toFile())
             setVariable("pluginDirPath", plugin.dir.absolutePathString())
-            setVariable("scriptDir", plugin.dir.absolutePathString())
-            setVariable("scriptDirFile", plugin.dir.toFile())
+            setVariable("scriptDir", plugin.dir.parent?.absolutePathString() ?: plugin.dir.absolutePathString())
+            setVariable("scriptDirFile", (plugin.dir.parent ?: plugin.dir).toFile())
             setVariable("processName", HostInfo.application.packageName)
-            setVariable("pluginProcess", true)
+            setVariable("pluginProcess", "main")
             setVariable("isMainProcess", true)
 
             // ===== Plugin Info =====
 
             setVariable("pluginPath", plugin.dir.absolutePathString())
-            setVariable("pluginDir", plugin.dir.toFile())
+            setVariable("pluginDir", plugin.dir.absolutePathString())
             setVariable("pluginDirFile", plugin.dir.toFile())
             setVariable("pluginId", plugin.name)
             setVariable("pluginName", plugin.info.name)
@@ -317,6 +317,20 @@ object JavaEngine {
                 val source = a[0] as String
                 val target = a[1] as String
                 runCatching { AudioUtils.anyToSilk(source, target) }.getOrDefault(false)
+            })
+            setMethod(BshMethod("autoToSilk", arrayOf(BString, BString, int)) { a ->
+                val source = a[0] as String; val target = a[1] as String
+                runCatching { if (AudioUtils.anyToSilk(source, target)) 0 else -1 }.getOrDefault(-1)
+            })
+            setMethod(BshMethod("getErrorMessage", arrayOf(int)) { a ->
+                when (a[0] as Int) { 0 -> "成功"; -1 -> "音频转换失败"; else -> "未知错误(${a[0]})" }
+            })
+            setMethod(BshMethod("getFileType", arrayOf(BString)) { a ->
+                val n = a[0] as String; n.substringAfterLast('.', "").lowercase()
+            })
+            setMethod(BshMethod("getAudioInfo", arrayOf(BString)) { a ->
+                val path = a[0] as String; val duration = AudioUtils.getDurationMs(path)
+                mapOf("duration" to duration, "durationMs" to duration)
             })
             setMethod(BshMethod("readWav", arrayOf(BString)) { a ->
                 val file = File(a[0] as String)
@@ -356,7 +370,7 @@ object JavaEngine {
                 })
             setMethod(
                 BshMethod(
-                    "wavToSilk", arrayOf(BString, BString)
+                    "wavToSilk", arrayOf(BString, BString, int)
                 ) {
                     AudioUtils.anyToSilk(it[0] as String, it[1] as String)
                 })
@@ -960,7 +974,7 @@ object JavaEngine {
                             }
 
                             doSceneMethod.invoke(msgObj, dispatcher, callbackProxy)
-                        }.onFailure { cb.accept(null) }
+                        }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                     }
                     return@BshMethod null
                 })
@@ -1022,7 +1036,7 @@ object JavaEngine {
                     val toUser = it[0] as String
                     val path = it[1] as String
                     return@BshMethod runCatchingBsh("sendVoice") {
-                        WeMessageApi.sendVoice(toUser, path, 0)
+                        sendVoiceCompat(toUser, path, 0)
                     }.getOrDefault(false)
                 })
 
@@ -1035,7 +1049,7 @@ object JavaEngine {
                     val path = it[1] as String
                     val durationMs = it[2] as Int
                     return@BshMethod runCatchingBsh("sendVoice") {
-                        WeMessageApi.sendVoice(toUser, path, durationMs)
+                        sendVoiceCompat(toUser, path, durationMs)
                     }.getOrDefault(false)
                 })
 
@@ -1606,9 +1620,10 @@ object JavaEngine {
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[3]; val url = a[0] as String; val headers = a[1] as? Map<String, String>; val timeout = a[2] as Long
                 thread { runCatching {
+                    pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} path=${path} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
-                    client.newCall(req).execute().use { r -> legacyHttpCallback(callback, r.code, r.body.string(), null) }
+                    client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
                 }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
             })
             setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, any)) { a ->
@@ -1618,12 +1633,13 @@ object JavaEngine {
                     val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
                     val req = okhttp3.Request.Builder().url(url).post(body).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
-                    client.newCall(req).execute().use { r -> legacyHttpCallback(callback, r.code, r.body.string(), null) }
+                    client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
                 }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
             })
             setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[4]; val url = a[0] as String; val path = a[1] as String; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
                 thread { runCatching {
+                    pluginLog(plugin, "HTTP request start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; val file = File(path); file.parentFile?.mkdirs()
@@ -1645,12 +1661,15 @@ object JavaEngine {
                 val cb = it[2] as Consumer<String?>
                 thread {
                     runCatching {
+                        pluginLog(plugin, "HTTP GET start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                         val req = okhttp3.Request.Builder().url(url).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
                         val resp = okhttp3.OkHttpClient().newCall(req).execute()
-                        cb.accept(resp.body.string())
-                    }.onFailure { cb.accept(null) }
+                        val text = resp.body.string()
+                        pluginLog(plugin, "HTTP response status=${resp.code} bytes=${text.toByteArray().size} body=${text.take(500)}")
+                        cb.accept(text)
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, Consumer::class.java)) {
@@ -1664,6 +1683,7 @@ object JavaEngine {
                 val cb = it[3] as Consumer<String?>
                 thread {
                     runCatching {
+                        pluginLog(plugin, "HTTP GET start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                         val req = okhttp3.Request.Builder().url(url).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
@@ -1672,15 +1692,17 @@ object JavaEngine {
                             .readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
                             .build()
                         val resp = client.newCall(req).execute()
-                        cb.accept(resp.body.string())
-                    }.onFailure { cb.accept(null) }
+                        val text = resp.body.string()
+                        pluginLog(plugin, "HTTP response status=${resp.code} bytes=${text.toByteArray().size} body=${text.take(500)}")
+                        cb.accept(text)
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
             setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, Consumer::class.java)) {
                 val url = it[0] as String
 
                 @Suppress("UNCHECKED_CAST")
-                val params = it[1] as? Map<String, String>
+                val params = it[1] as? Map<*, *>
 
                 @Suppress("UNCHECKED_CAST")
                 val headers = it[2] as? Map<String, String>
@@ -1689,21 +1711,22 @@ object JavaEngine {
                 val cb = it[3] as Consumer<String?>
                 thread {
                     runCatching {
-                        val form = okhttp3.FormBody.Builder()
-                        params?.forEach { (k, v) -> form.add(k, v) }
-                        val req = okhttp3.Request.Builder().url(url).post(form.build()).apply {
+                        val body = if (headers?.entries?.any { e -> e.key.equals("Content-Type", true) && e.value.contains("application/json", true) } == true) org.json.JSONObject(params ?: emptyMap<Any, Any>()).toString().toRequestBody("application/json; charset=utf-8".toMediaType()) else okhttp3.FormBody.Builder().apply { params?.forEach { (k, v) -> if (k != null && v != null) add(k.toString(), v.toString()) } }.build()
+                        val req = okhttp3.Request.Builder().url(url).post(body).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
                         val resp = okhttp3.OkHttpClient().newCall(req).execute()
-                        cb.accept(resp.body.string())
-                    }.onFailure { cb.accept(null) }
+                        val text = resp.body.string()
+                        pluginLog(plugin, "HTTP response status=${resp.code} bytes=${text.toByteArray().size} body=${text.take(500)}")
+                        cb.accept(text)
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
             setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, Consumer::class.java)) {
                 val url = it[0] as String
 
                 @Suppress("UNCHECKED_CAST")
-                val params = it[1] as? Map<String, String>
+                val params = it[1] as? Map<*, *>
 
                 @Suppress("UNCHECKED_CAST")
                 val headers = it[2] as? Map<String, String>
@@ -1713,9 +1736,8 @@ object JavaEngine {
                 val cb = it[4] as Consumer<String?>
                 thread {
                     runCatching {
-                        val form = okhttp3.FormBody.Builder()
-                        params?.forEach { (k, v) -> form.add(k, v) }
-                        val req = okhttp3.Request.Builder().url(url).post(form.build()).apply {
+                        val body = if (headers?.entries?.any { e -> e.key.equals("Content-Type", true) && e.value.contains("application/json", true) } == true) org.json.JSONObject(params ?: emptyMap<Any, Any>()).toString().toRequestBody("application/json; charset=utf-8".toMediaType()) else okhttp3.FormBody.Builder().apply { params?.forEach { (k, v) -> if (k != null && v != null) add(k.toString(), v.toString()) } }.build()
+                        val req = okhttp3.Request.Builder().url(url).post(body).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
                         val client = okhttp3.OkHttpClient.Builder()
@@ -1723,8 +1745,10 @@ object JavaEngine {
                             .readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS)
                             .build()
                         val resp = client.newCall(req).execute()
-                        cb.accept(resp.body.string())
-                    }.onFailure { cb.accept(null) }
+                        val text = resp.body.string()
+                        pluginLog(plugin, "HTTP response status=${resp.code} bytes=${text.toByteArray().size} body=${text.take(500)}")
+                        cb.accept(text)
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
             setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, Consumer::class.java)) {
@@ -1738,14 +1762,16 @@ object JavaEngine {
                 val cb = it[3] as Consumer<File?>
                 thread {
                     runCatching {
+                        pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} path=${path}")
                         val req = okhttp3.Request.Builder().url(url).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
                         val resp = okhttp3.OkHttpClient().newCall(req).execute()
                         val file = File(path)
                         Files.copy(resp.body.byteStream(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        pluginLog(plugin, "DOWNLOAD success status=${resp.code} bytes=${file.length()} path=${file.absolutePath}")
                         cb.accept(file)
-                    }.onFailure { cb.accept(null) }
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
             setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, Consumer::class.java)) {
@@ -1760,6 +1786,7 @@ object JavaEngine {
                 val cb = it[4] as Consumer<File?>
                 thread {
                     runCatching {
+                        pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} path=${path}")
                         val req = okhttp3.Request.Builder().url(url).apply {
                             headers?.forEach { (k, v) -> addHeader(k, v) }
                         }.build()
@@ -1770,8 +1797,9 @@ object JavaEngine {
                         val resp = client.newCall(req).execute()
                         val file = File(path)
                         Files.copy(resp.body.byteStream(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        pluginLog(plugin, "DOWNLOAD success status=${resp.code} bytes=${file.length()} path=${file.absolutePath}")
                         cb.accept(file)
-                    }.onFailure { cb.accept(null) }
+                    }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
                 }
             })
 
@@ -2122,6 +2150,27 @@ object JavaEngine {
                     return@BshMethod getTopMostActivity()
                 })
         }
+    }
+
+    private fun safeUrl(url: String): String = runCatching {
+        val u = java.net.URI(url)
+        val query = if (u.query.isNullOrEmpty()) "" else "?query=<redacted>"
+        java.net.URI(u.scheme, u.userInfo, u.host, u.port, u.path, null, u.fragment).toString() + query
+    }.getOrDefault(url.substringBefore('?'))
+
+    private fun safeHeaders(headers: Map<String, String>?): String = headers?.entries?.joinToString(",", "{", "}") { (k, v) ->
+        val masked = if (k.equals("authorization", true) || k.equals("x-api-key", true) || k.equals("api-key", true) || k.equals("token", true)) "<redacted>" else v.take(80)
+        "$k=$masked"
+    } ?: "{}"
+
+    private fun sendVoiceCompat(toUser: String, source: String, durationMs: Int): Boolean {
+        val input = File(source)
+        require(input.isFile) { "音频文件不存在: $source" }
+        val isSilk = input.inputStream().use { it.readNBytes(16).toString(Charsets.US_ASCII).contains("#!SILK_V3") }
+        if (isSilk) return WeMessageApi.sendVoice(toUser, source, durationMs.coerceAtLeast(1))
+        val silk = File(input.parentFile ?: KnownPaths.moduleCache.toFile(), input.nameWithoutExtension + ".wekit.silk")
+        require(AudioUtils.anyToSilk(source, silk.absolutePath)) { "音频转换为 Silk 失败" }
+        return try { WeMessageApi.sendVoice(toUser, silk.absolutePath, durationMs.coerceAtLeast(1)) } finally { silk.delete() }
     }
 
     private fun pluginLog(plugin: JavaPlugin, message: String) {
