@@ -1036,7 +1036,7 @@ object JavaEngine {
                     val toUser = it[0] as String
                     val path = it[1] as String
                     return@BshMethod runCatchingBsh("sendVoice") {
-                        sendVoiceCompat(toUser, path, 0)
+                        sendVoiceCompat(toUser, path, runCatching { AudioUtils.getDurationMs(path).toInt() }.getOrDefault(1000))
                     }.getOrDefault(false)
                 })
 
@@ -1049,7 +1049,7 @@ object JavaEngine {
                     val path = it[1] as String
                     val durationMs = it[2] as Int
                     return@BshMethod runCatchingBsh("sendVoice") {
-                        sendVoiceCompat(toUser, path, durationMs)
+                        sendVoiceCompat(toUser, path, durationMs * 1000)
                     }.getOrDefault(false)
                 })
 
@@ -1620,7 +1620,7 @@ object JavaEngine {
             setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[3]; val url = a[0] as String; val headers = a[1] as? Map<String, String>; val timeout = a[2] as Long
                 thread { runCatching {
-                    pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
+                    pluginLog(plugin, "HTTP GET start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
@@ -1629,6 +1629,7 @@ object JavaEngine {
             setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[4]; val url = a[0] as String; val params = a[1]; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
                 thread { runCatching {
+                    pluginLog(plugin, "HTTP POST start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
                     val json = if (params is org.json.JSONObject) params.toString() else if (params is Map<*, *>) org.json.JSONObject(params).toString() else params?.toString() ?: "{}"
                     val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
                     val req = okhttp3.Request.Builder().url(url).post(body).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
@@ -1639,7 +1640,7 @@ object JavaEngine {
             setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[4]; val url = a[0] as String; val path = a[1] as String; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
                 thread { runCatching {
-                    pluginLog(plugin, "HTTP request start url=${safeUrl(url)} headers=${safeHeaders(headers)}")
+                    pluginLog(plugin, "DOWNLOAD start url=${safeUrl(url)} path=${path} headers=${safeHeaders(headers)}")
                     val req = okhttp3.Request.Builder().url(url).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> require(r.isSuccessful) { "HTTP ${r.code}" }; val file = File(path); file.parentFile?.mkdirs()
