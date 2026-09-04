@@ -325,7 +325,7 @@ object JavaEngine {
                     require(sampleRate > 0 && channels > 0 && dataOffset >= 0) { "invalid WAV format" }
                     require(bits == 16) { "only 16-bit WAV is supported" }
                     val duration = if (sampleRate > 0 && channels > 0) dataSize * 1000L / (sampleRate.toLong() * channels * 2L) else 0L
-                    arrayOf(sampleRate, channels, duration, dataOffset)
+                    arrayOf<Any>(sampleRate, channels, duration, dataOffset)
                 }
             })
             // ===== Audio Utils =====
