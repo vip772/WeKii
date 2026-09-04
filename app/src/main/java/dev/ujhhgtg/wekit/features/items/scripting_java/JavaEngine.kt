@@ -28,6 +28,11 @@ import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import android.graphics.drawable.ColorDrawable
+import android.content.Context
+import androidx.compose.material3.Text
+import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
+import dev.ujhhgtg.wekit.ui.content.TextButton
+import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Info
 import dev.ujhhgtg.wekit.features.api.ui.WeMomentsApi
@@ -278,7 +283,6 @@ object JavaEngine {
             setVariable("pluginPath", plugin.dir.absolutePathString())
             setVariable("pluginDir", plugin.dir.toFile())
             setVariable("pluginDirFile", plugin.dir.toFile())
-            setVariable("PluginCallBack", LegacyPluginCallBack(plugin))
             setVariable("pluginId", plugin.name)
             setVariable("pluginName", plugin.info.name)
             setVariable("pluginAuthor", plugin.info.author)
@@ -1944,6 +1948,20 @@ object JavaEngine {
                         .self
                     uploadMethod.invoke(getInstance.invoke(null), System.currentTimeMillis() / 1000, stepCount)
                 }.onFailure { WeLogger.e(TAG, "uploadDeviceStep failed", it) }
+            })
+            setMethod(BshMethod("showModuleDialog", arrayOf(BString, BString, BString)) { args ->
+                val title = args[0] as String
+                val message = args[1] as String
+                val activity = getTopMostActivity(allowPaused = true)
+                if (activity != null) Handler(Looper.getMainLooper()).post {
+                    showComposeDialog(activity) {
+                        AlertDialogContent(
+                            title = { Text(title) },
+                            text = { Text(message) },
+                            confirmButton = { TextButton(onClick = onDismiss) { Text("确定") } },
+                        )
+                    }
+                }
             })
             setMethod(BshMethod("registerMessageMenu", arrayOf(BString, BString, Consumer::class.java)) { args ->
                 val title = args[0] as String
