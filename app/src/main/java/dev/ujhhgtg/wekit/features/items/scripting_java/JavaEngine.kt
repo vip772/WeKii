@@ -1613,7 +1613,7 @@ object JavaEngine {
                 val callback = a[4]; val url = a[0] as String; val params = a[1]; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
                 thread { runCatching {
                     val json = if (params is org.json.JSONObject) params.toString() else if (params is Map<*, *>) org.json.JSONObject(params).toString() else params?.toString() ?: "{}"
-                    val body = okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"), json)
+                    val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
                     val req = okhttp3.Request.Builder().url(url).post(body).apply { headers?.forEach { (k,v) -> addHeader(k,v) } }.build()
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> legacyHttpCallback(callback, r.code, r.body.string(), null) }
