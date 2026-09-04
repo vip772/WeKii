@@ -91,13 +91,16 @@ object JavaEngine {
                 pluginLog(plugin, "evaluating plugin")
                 plugin.interpreter.eval(plugin.content)
                 pluginLog(plugin, "plugin evaluated successfully")
+                pluginLog(plugin, "namespace methods: " + plugin.interpreter.nameSpace.getMethods().joinToString { it.name })
 
                 val bshMethod = plugin.interpreter.nameSpace.getMethod("onLoad", emptyArray())
                 bshMethod?.apply {
                     invoke(arrayOf(), plugin.interpreter)
+                    pluginLog(plugin, "onLoad executed")
                     WeLogger.i(TAG, "onLoad executed for script ${plugin.name}")
                 }
             } catch (e: Exception) {
+                pluginLog(plugin, "onLoad execution failed: " + (e.message ?: e.javaClass.name))
                 WeLogger.e(TAG, "onLoad execution failed for script ${plugin.name}", e)
             }
         }
@@ -283,6 +286,13 @@ object JavaEngine {
             // ===== FileSystem Info =====
 
             setVariable("cacheDir", KnownPaths.moduleCache.absolutePathString())
+            setVariable("cacheDirFile", KnownPaths.moduleCache.toFile())
+            setVariable("pluginDirPath", plugin.dir.absolutePathString())
+            setVariable("scriptDir", plugin.dir.absolutePathString())
+            setVariable("scriptDirFile", plugin.dir.toFile())
+            setVariable("processName", HostInfo.application.packageName)
+            setVariable("pluginProcess", true)
+            setVariable("isMainProcess", true)
 
             // ===== Plugin Info =====
 
