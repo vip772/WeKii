@@ -1597,11 +1597,25 @@ object JavaEngine {
 
             // Legacy callback adapters: old plugins pass PluginCallBack callbacks instead of Consumer.
             fun invokeLegacy(target: Any?, name: String, signatures: Array<Class<*>>, values: Array<Any?>) {
-                if (target == null) return
-                runCatching {
-                    val method = target.javaClass.methods.firstOrNull { it.name == name && it.parameterTypes.contentEquals(signatures) }
-                    method?.invoke(target, *values)
+                if (target == null) {
+                    pluginLog(plugin, "callback $name skipped: null target")
+                    return
                 }
+                runCatching {
+                    val candidates = (target.javaClass.methods.asSequence() + target.javaClass.declaredMethods.asSequence())
+                        .filter { it.name == name && it.parameterCount == signatures.size }.toList()
+                    val method = candidates.firstOrNull { m ->
+                        m.parameterTypes.zip(signatures).all { (actual, expected) ->
+                            actual == expected || expected.isAssignableFrom(actual) ||
+                                (actual == java.lang.Integer::class.java && expected == Integer.TYPE) ||
+                                (actual == java.lang.Long::class.java && expected == java.lang.Long.TYPE)
+                        }
+                    }
+                    pluginLog(plugin, "callback ${target.javaClass.name}.$name candidates=${candidates.size} found=${method != null}")
+                    if (method == null) error("callback method not found: $name")
+                    method.isAccessible = true
+                    method.invoke(target, *values)
+                }.onFailure { pluginLog(plugin, "callback $name failed: ${it.javaClass.simpleName}: ${it.message}") }
             }
             fun legacyHttpCallback(callback: Any?, status: Int, response: String?, error: Exception?) {
                 if (error != null) invokeLegacy(callback, "onError", arrayOf(Exception::class.java), arrayOf(error))
