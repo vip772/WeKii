@@ -83,6 +83,19 @@ class JavaEngineApiSurfaceTest {
         callbackImportFragments.forEach { signature ->
             assertTrue(source.contains(signature), "Nested callback import is missing: $signature")
         }
+        assertTrue(
+            source.contains("private fun normalizeCallbackTypeNames(source: String): String"),
+            "Nested callback source compatibility normalizer is missing",
+        )
+        assertTrue(
+            source.contains("plugin.interpreter.eval(normalizeCallbackTypeNames(plugin.content))"),
+            "Plugin source is not evaluated through the compatibility normalizer",
+        )
+        assertTrue(
+            source.contains(".replace(\"PluginCallBack.HttpCallback\", \"HttpCallback\")") &&
+                source.contains(".replace(\"PluginCallBack.DownloadCallback\", \"DownloadCallback\")"),
+            "Nested callback type aliases are incomplete",
+        )
         originalHookSignatures.forEach { signature ->
             assertTrue(Regex(signature).containsMatchIn(source), "Existing hook signature is missing: $signature")
         }
