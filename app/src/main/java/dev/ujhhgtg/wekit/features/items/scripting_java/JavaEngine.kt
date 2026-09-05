@@ -345,8 +345,9 @@ object JavaEngine {
             // pl-compatible public callback API. Use the module route explicitly so
             // BeanShell resolves the class from the same loader that owns this APK.
             importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.HttpCallback")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack.DownloadCallback")
+            // BeanShell resolves nested JVM types by their binary `$` name.
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback")
+            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback")
             importPackage("me.hd.wauxv.plugin.api.callback")
             importPackage("dev.ujhhgtg.wekit.features.api.core")
             importPackage("dev.ujhhgtg.wekit.features.api.ui")

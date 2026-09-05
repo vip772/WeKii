@@ -34,6 +34,11 @@ class JavaEngineApiSurfaceTest {
         "BshMethod(\"uploadDeviceStep\", arrayOf(java.lang.Long.TYPE))",
     )
 
+    private val callbackImportFragments = setOf(
+        "importClass(\"MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\\$HttpCallback\")",
+        "importClass(\"MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\\$DownloadCallback\")",
+    )
+
     private val originalHookSignatures = setOf(
         """BshMethod\(\s*"hookBefore"\s*,\s*arrayOf\(Member::class.java,\s*Consumer::class.java\)""",
         """BshMethod\(\s*"hookAfter"\s*,\s*arrayOf\(Member::class.java,\s*Consumer::class.java\)""", 
@@ -74,6 +79,9 @@ class JavaEngineApiSurfaceTest {
         )
         originalSignatureFragments.forEach { signature ->
             assertTrue(source.contains(signature), "Existing script signature is missing: $signature")
+        }
+        callbackImportFragments.forEach { signature ->
+            assertTrue(source.contains(signature), "Nested callback import is missing: $signature")
         }
         originalHookSignatures.forEach { signature ->
             assertTrue(Regex(signature).containsMatchIn(source), "Existing hook signature is missing: $signature")
