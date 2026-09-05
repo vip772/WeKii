@@ -853,9 +853,20 @@ private object GroupChatAnalysisEngine {
         }.getOrDefault(0)
         val history = scalar("SELECT COUNT(*) FROM message WHERE talker=?", arrayOf(talker))
         val today = scalar("SELECT COUNT(*) FROM message WHERE talker=? AND createTime>=?", arrayOf(talker, todayStart))
-        // Reuse the same sender parser as load(); SQL substring extraction previously
-        // retained the ':' suffix and accepted malformed/system rows.
+        val members = runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList())
+        val memberIds = members.map { it.wxId }.filter { it.isNotBlank() }.toSet()
+        val memberAliases = buildMap {
+            members.forEach { member ->
+                listOf(member.wxId, member.nickname, member.displayName)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .forEach { put(it, member.wxId) }
+            }
+        }
+        // Count stable member IDs, not raw content prefixes. The message table can
+        // contain wxid, nickname, or CRLF-prefixed sender forms interchangeably.
         val todaySenders = mutableSetOf<String>()
+        val senderPrefix = Regex("""^([^\r\n:]+):(?:\r?\n|$)""")
         WeDatabaseApi.rawQuery(
             "SELECT content,isSend FROM message WHERE talker=? AND createTime>=?",
             arrayOf(talker, todayStart),
@@ -866,10 +877,12 @@ private object GroupChatAnalysisEngine {
                 val senderId = if (cursor.getInt(sendIndex) != 0) {
                     WeApi.selfWxId
                 } else {
-                    groupSenderRegex.find(cursor.getString(contentIndex).orEmpty())
-                        ?.groupValues?.get(1)?.trim().orEmpty()
+                    senderPrefix.find(cursor.getString(contentIndex).orEmpty())
+                        ?.groupValues?.get(1)?.trim()
+                        ?.let { memberAliases[it] }
+                        .orEmpty()
                 }
-                if (senderId.isNotBlank()) todaySenders += senderId
+                if (senderId in memberIds || senderId == WeApi.selfWxId) todaySenders += senderId
             }
         }
         val todayUsers = todaySenders.size
