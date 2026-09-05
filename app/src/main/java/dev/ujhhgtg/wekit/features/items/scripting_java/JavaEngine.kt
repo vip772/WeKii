@@ -2406,7 +2406,7 @@ object JavaEngine {
             })
             setMethod(BshMethod("uploadDeviceStep", arrayOf(java.lang.Long.TYPE)) { args ->
                 val stepCount = args[0] as Long
-                WeChatService.uploadDeviceStep(stepCount).isSuccess
+                WeChatService.uploadDeviceStep(stepCount) is WeChatService.Result.Success<*>
             })
             setMethod(BshMethod("showModuleDialog", arrayOf(BString, BString, BString)) { args ->
                 val title = args[0] as String
