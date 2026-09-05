@@ -2512,6 +2512,51 @@ object JavaEngine {
                 ) {
                     return@BshMethod getTopMostActivity()
                 })
+
+            // PL-compatible typed callback bridge. The methods are declared by
+            // BeanShell in this same interpreter, so anonymous classes such as
+            // new PluginCallBack.HttpCallback() are resolved before dispatch.
+            plugin.interpreter.eval(
+                """
+                import java.io.File;
+                import java.util.Map;
+                import java.util.function.Consumer;
+                import me.hd.wauxv.plugin.api.callback.PluginCallBack;
+                void get(String url, Map headerMap, PluginCallBack.HttpCallback callback) {
+                    get(url, headerMap, 30L, callback);
+                }
+                void get(String url, Map headerMap, long timeout, PluginCallBack.HttpCallback callback) {
+                    wa.get(url, headerMap, timeout, new Consumer() {
+                        public void accept(Object body) {
+                            if (body != null) callback.onSuccess(200, String.valueOf(body));
+                            else callback.onError(new Exception("GET failed: " + url));
+                        }
+                    });
+                }
+                void post(String url, Map paramMap, Map headerMap, PluginCallBack.HttpCallback callback) {
+                    post(url, paramMap, headerMap, 30L, callback);
+                }
+                void post(String url, Map paramMap, Map headerMap, long timeout, PluginCallBack.HttpCallback callback) {
+                    wa.post(url, paramMap, headerMap, timeout, new Consumer() {
+                        public void accept(Object body) {
+                            if (body != null) callback.onSuccess(200, String.valueOf(body));
+                            else callback.onError(new Exception("POST failed: " + url));
+                        }
+                    });
+                }
+                void download(String url, String path, Map headerMap, PluginCallBack.DownloadCallback callback) {
+                    download(url, path, headerMap, 30L, callback);
+                }
+                void download(String url, String path, Map headerMap, long timeout, PluginCallBack.DownloadCallback callback) {
+                    wa.download(url, path, headerMap, timeout, new Consumer() {
+                        public void accept(Object file) {
+                            if (file instanceof File) callback.onSuccess((File) file);
+                            else callback.onError(new Exception("Download failed: " + url));
+                        }
+                    });
+                }
+                """.trimIndent()
+            )
         }
     }
 
