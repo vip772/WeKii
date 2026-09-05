@@ -23,7 +23,13 @@ class JavaEngineApiSurfaceTest {
         "BshMethod(\"uploadText\", arrayOf(org.json.JSONObject::class.java))",
         "BshMethod(\"uploadTextAndPicList\", arrayOf(BString, List::class.java))",
         "BshMethod(\"downloadImage\", arrayOf(BString, Consumer::class.java))",
+        "BshMethod(\"downloadImage\", arrayOf(BString, BString, Consumer::class.java))",
         "BshMethod(\"downloadImages\", arrayOf(List::class.java, Consumer::class.java))",
+        "BshMethod(\"downloadImages\", arrayOf(List::class.java, BString, Consumer::class.java))",
+        "BshMethod(\"download\", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any))",
+        "BshMethod(\"download\", arrayOf(BString, BString, Map::class.java, Consumer::class.java))",
+        "BshMethod(\"downloadVideo\", arrayOf(BString, Consumer::class.java))",
+        "BshMethod(\"downloadVideo\", arrayOf(BString, BString, Consumer::class.java))",
         "BshMethod(\"startTransform\", arrayOf(int, BString, BString, int, Consumer::class.java))",
         "BshMethod(\"uploadDeviceStep\", arrayOf(java.lang.Long.TYPE))",
     )
@@ -37,9 +43,21 @@ class JavaEngineApiSurfaceTest {
         "BshMethod(\"uploadVideo\", arrayOf(BString))",
         "BshMethod(\"uploadVideo\", arrayOf(org.json.JSONObject::class.java))",
         "BshMethod(\"uploadTextAndVideo\", arrayOf(BString, BString))",
+        "BshMethod(\"uploadTextAndVideo\", arrayOf(BString, BString, BString, BString))",
         "BshMethod(\"uploadTextAndVideo\", arrayOf(org.json.JSONObject::class.java))",
+        "BshMethod(\"registerPlusMenu\", arrayOf(BString, Consumer::class.java))",
+        "BshMethod(\"registerPlusMenu\", arrayOf(BString, BString, Consumer::class.java))",
+        "BshMethod(\"registerPlusMenu\", arrayOf(BString, BString, java.lang.Boolean.TYPE, Consumer::class.java))",
+        "BshMethod(\"registerPlusMenu\", arrayOf(BString, java.lang.Boolean.TYPE, Consumer::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, BString))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, BString, Consumer::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, org.json.JSONObject::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, org.json.JSONObject::class.java, Consumer::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, int, int, BString))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, int, int, BString, Consumer::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, int, int, org.json.JSONObject::class.java))",
+        "BshMethod(\"sendProtobufPacket\", arrayOf(BString, int, int, int, org.json.JSONObject::class.java, Consumer::class.java))",
     )
-
     @Test
     fun originalAndAdditiveScriptEntrypointsRemainRegistered() {
         val source = readJavaEngineSource()
@@ -64,6 +82,26 @@ class JavaEngineApiSurfaceTest {
             assertTrue(source.contains(signature), "Additive script signature is missing: $signature")
         }
     }
+
+    @Test
+    fun unavailableHostCapabilitiesRemainExplicit() {
+        val source = readJavaEngineSource()
+
+        assertTrue(
+            source.contains("WeKii 当前没有 Protobuf transport runtime"),
+            "Protobuf compatibility entrypoints must report the missing transport runtime",
+        )
+        assertTrue(
+            source.contains("registerPlusMenu degraded to message menu"),
+            "Plus-menu compatibility must remain an explicit message-menu fallback",
+        )
+        assertTrue(
+            !source.contains("BshMethod(\"uploadLivePhoto\"") &&
+                !source.contains("BshMethod(\"uploadTextAndLivePhoto\""),
+            "Live-photo entrypoints must not be exposed until the host media pipeline exists",
+        )
+    }
+
 
     private fun readJavaEngineSource(): String {
         val relative = Paths.get(
