@@ -23,6 +23,8 @@ import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.WePaymentApi
 import dev.ujhhgtg.wekit.features.api.core.WeServiceApi
+import dev.ujhhgtg.wekit.features.items.system.servers.WeChatService
+
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
@@ -1714,7 +1716,10 @@ object JavaEngine {
                     }
                 }
             })
-
+            // Remove all hooks created by the current script engine instance.
+            setMethod(BshMethod("unhookEverything", emptyArray<Class<*>>()) {
+                JavaHookApi.unhookEverything()
+            })
             // Legacy callback adapters: old plugins pass PluginCallBack callbacks instead of Consumer.
             fun invokeLegacy(target: Any?, name: String, signatures: Array<Class<*>>, values: Array<Any?>) {
                 if (target == null) {
@@ -1781,6 +1786,82 @@ object JavaEngine {
                     val client = okhttp3.OkHttpClient.Builder().connectTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).readTimeout(timeout, java.util.concurrent.TimeUnit.SECONDS).build()
                     client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
                 }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
+            })
+            // pl-compatible URL media downloads. These are separate from download()
+            // because pl exposes a callback-oriented URL API as wa.downloadImage().
+            setMethod(BshMethod("downloadImage", arrayOf(BString, Consumer::class.java)) { args ->
+                val url = args[0] as String
+                val callback = args[1] as Consumer<Any?>
+                thread {
+                    val file = runCatching {
+                        val target = File(KnownPaths.moduleCache.toFile(), "script-image-${System.nanoTime()}.bin")
+                        target.parentFile?.mkdirs()
+                        okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                            require(response.isSuccessful) { "HTTP ${response.code}" }
+                            response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                        }
+                        target
+                    }.getOrNull()
+                    callback.accept(file)
+                }
+            })
+            setMethod(BshMethod("downloadImage", arrayOf(BString, BString, Consumer::class.java)) { args ->
+                val url = args[0] as String
+                val fileName = args[1] as String
+                val callback = args[2] as Consumer<Any?>
+                thread {
+                    val file = runCatching {
+                        val root = KnownPaths.moduleCache.toFile().canonicalFile
+                        val target = File(root, fileName).canonicalFile
+                        require(target.toPath().startsWith(root.toPath())) { "download target escapes module cache" }
+                        target.parentFile?.mkdirs()
+                        okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                            require(response.isSuccessful) { "HTTP ${response.code}" }
+                            response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                        }
+                        target
+                    }.onFailure { pluginLog(plugin, "downloadImage failed: ${it.message}") }.getOrNull()
+                    callback.accept(file)
+                }
+            })
+            setMethod(BshMethod("downloadImages", arrayOf(List::class.java, Consumer::class.java)) { args ->
+                val urls = args[0] as List<*>
+                val callback = args[1] as Consumer<Any?>
+                thread {
+                    val files = urls.mapNotNull { value ->
+                        val url = value?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                        runCatching {
+                            val target = File(KnownPaths.moduleCache.toFile(), "script-image-${System.nanoTime()}.bin")
+                            target.parentFile?.mkdirs()
+                            okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                                require(response.isSuccessful) { "HTTP ${response.code}" }
+                                response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                            }
+                            target
+                        }.getOrNull()
+                    }
+                    callback.accept(files)
+                }
+            })
+            setMethod(BshMethod("downloadImages", arrayOf(List::class.java, BString, Consumer::class.java)) { args ->
+                val urls = args[0] as List<*>
+                val prefix = args[1] as String
+                val callback = args[2] as Consumer<Any?>
+                thread {
+                    val files = urls.mapIndexedNotNull { index, value ->
+                        val url = value?.toString()?.takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
+                        runCatching {
+                            val target = File(KnownPaths.moduleCache.toFile(), "$prefix-$index.bin")
+                            target.parentFile?.mkdirs()
+                            okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                                require(response.isSuccessful) { "HTTP ${response.code}" }
+                                response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                            }
+                            target
+                        }.getOrNull()
+                    }
+                    callback.accept(files)
+                }
             })
             setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any)) { a ->
                 val callback = a[4]; val url = a[0] as String; val path = a[1] as String; val headers = a[2] as? Map<String, String>; val timeout = a[3] as Long
@@ -2191,6 +2272,121 @@ object JavaEngine {
                 @Suppress("UNCHECKED_CAST")
                 WeContactLabelApi.modifyLabel(it[0] as String, it[1] as List<String>)
             })
+            // pl-compatible audio transform dispatcher. WeKii's audio layer exposes the
+            // conversion primitives directly, so unsupported pl transform types report a
+            // structured error instead of silently doing a different conversion.
+            setMethod(BshMethod("startTransform", arrayOf(int, BString, BString, int, Consumer::class.java)) { args ->
+                val type = args[0] as Int
+                val input = args[1] as String
+                val output = args[2] as String
+                val sampleRate = args[3] as Int
+                val callback = args[4] as Consumer<Any?>
+                thread {
+                    val result = runCatching {
+                        when (type) {
+                            0 -> {
+                                val pcm = "$output.tmp"
+                                try {
+                                    require(AudioUtils.silkToPcm(input, pcm)) { "Silk 转 PCM 失败" }
+                                    require(AudioUtils.pcmToMp3(pcm, output)) { "PCM 转 MP3 失败" }
+                                } finally { File(pcm).delete() }
+                            }
+                            1, 5, 9 -> require(AudioUtils.anyToSilk(input, output)) { "音频转 Silk 失败" }
+                            6 -> require(AudioUtils.silkToPcm(input, output)) { "Silk 转 PCM 失败" }
+                            else -> error("WeKii 不支持 startTransform 类型: $type")
+                        }
+                        0
+                    }.getOrElse { error ->
+                        callback.accept(mapOf("type" to "message", "message" to (error.message ?: error.javaClass.simpleName)))
+                        return@thread
+                    }
+                    callback.accept(mapOf("type" to "progress", "progress" to 100, "code" to result, "sampleRate" to sampleRate))
+                }
+            })
+            // The current WeKii hook layer has no protobuf transport runtime. Keep the
+            // pl signatures callable and report the capability gap through the callback.
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, BString)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, BString, Consumer::class.java)) { args ->
+                (args[3] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+            })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, org.json.JSONObject::class.java)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, org.json.JSONObject::class.java, Consumer::class.java)) { args ->
+                (args[3] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+            })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, BString)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, BString, Consumer::class.java)) { args ->
+                (args[5] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+            })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, org.json.JSONObject::class.java)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, org.json.JSONObject::class.java, Consumer::class.java)) { args ->
+                (args[5] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+            })
+            // WeKii has no plus-menu dispatcher. Registering through the existing message
+            // menu keeps the API callable while making the degraded behavior explicit.
+            fun registerCompatPlusMenu(title: String, callback: Consumer<Any?>): Int {
+                val menuId = ("compat_plus_" + plugin.name + "_" + title).hashCode()
+                val provider = object : WeChatMessageContextMenuApi.IMenuItemsProvider {
+                    override fun getMenuItems() = listOf(WeChatMessageContextMenuApi.MenuItem(
+                        id = menuId,
+                        text = title,
+                        drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
+                        imageVector = MaterialSymbols.Outlined.Info,
+                        isSupported = { true },
+                        onClick = { _, _, message -> callback.accept(message) }
+                    ))
+                }
+                unregisterPluginMenu(plugin.name)
+                menuProviders[plugin.name] = provider
+                WeChatMessageContextMenuApi.addProvider(provider)
+                pluginLog(plugin, "registerPlusMenu degraded to message menu")
+                return menuId
+            }
+            setMethod(BshMethod("registerPlusMenu", arrayOf(BString, Consumer::class.java)) { args ->
+                registerCompatPlusMenu(args[0] as String, args[1] as Consumer<Any?>)
+            })
+            setMethod(BshMethod("registerPlusMenu", arrayOf(BString, BString, Consumer::class.java)) { args ->
+                registerCompatPlusMenu(args[0] as String, args[2] as Consumer<Any?>)
+            })
+            setMethod(BshMethod("registerPlusMenu", arrayOf(BString, BString, java.lang.Boolean.TYPE, Consumer::class.java)) { args ->
+                registerCompatPlusMenu(args[0] as String, args[3] as Consumer<Any?>)
+            })
+            setMethod(BshMethod("registerPlusMenu", arrayOf(BString, java.lang.Boolean.TYPE, Consumer::class.java)) { args ->
+                registerCompatPlusMenu(args[0] as String, args[2] as Consumer<Any?>)
+            })
+            setMethod(BshMethod("downloadVideo", arrayOf(BString, Consumer::class.java)) { args ->
+                val url = args[0] as String
+                val callback = args[1] as Consumer<Any?>
+                thread {
+                    val file = runCatching {
+                        val target = File(KnownPaths.moduleCache.toFile(), "script-video-${System.nanoTime()}.mp4")
+                        okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                            require(response.isSuccessful) { "HTTP ${response.code}" }
+                            response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                        }
+                        target
+                    }.onFailure { pluginLog(plugin, "downloadVideo failed: ${it.message}") }.getOrNull()
+                    callback.accept(file ?: mapOf("error" to "video download failed"))
+                }
+            })
+            setMethod(BshMethod("downloadVideo", arrayOf(BString, BString, Consumer::class.java)) { args ->
+                val url = args[0] as String
+                val fileName = args[1] as String
+                val callback = args[2] as Consumer<Any?>
+                thread {
+                    val file = runCatching {
+                        val root = KnownPaths.moduleCache.toFile().canonicalFile
+                        val target = File(root, fileName).canonicalFile
+                        require(target.toPath().startsWith(root.toPath())) { "download target escapes module cache" }
+                        target.parentFile?.mkdirs()
+                        okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute().use { response ->
+                            require(response.isSuccessful) { "HTTP ${response.code}" }
+                            response.body.byteStream().use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                        }
+                        target
+                    }.onFailure { pluginLog(plugin, "downloadVideo failed: ${it.message}") }.getOrNull()
+                    callback.accept(file ?: mapOf("error" to "video download failed"))
+                }
+            })
             setMethod(BshMethod("downloadImg", arrayOf(BString, BString, BString, BString)) { args ->
 //                val talker = it[0] as String
                 val content = args[1] as String
@@ -2210,16 +2406,7 @@ object JavaEngine {
             })
             setMethod(BshMethod("uploadDeviceStep", arrayOf(java.lang.Long.TYPE)) { args ->
                 val stepCount = args[0] as Long
-                runCatching {
-                    val devStepMgrClazz = "com.tencent.mm.plugin.sport.model.DeviceStepManager".toClass()
-                    val uploadMethod = devStepMgrClazz.reflekt()
-                        .firstMethod { parameters(Long::class.java, Long::class.java) }
-                        .self
-                    val getInstance = devStepMgrClazz.reflekt()
-                        .firstMethod { modifiers(Modifiers.STATIC); parameters() }
-                        .self
-                    uploadMethod.invoke(getInstance.invoke(null), System.currentTimeMillis() / 1000, stepCount)
-                }.onFailure { WeLogger.e(TAG, "uploadDeviceStep failed", it) }
+                WeChatService.uploadDeviceStep(stepCount).isSuccess
             })
             setMethod(BshMethod("showModuleDialog", arrayOf(BString, BString, BString)) { args ->
                 val title = args[0] as String

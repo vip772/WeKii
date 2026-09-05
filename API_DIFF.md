@@ -2,7 +2,7 @@
 
 Generated during the `pl` runtime compatibility port. Baseline repositories:
 
-- WeKii: `dev` at `3c08eedd`
+- WeKii: `dev` at `b807f1be` before this local compatibility round
 - pl: `origin/dev` at `b0e2ab8`
 
 This is a compatibility inventory, not a promise that host-only capabilities are available. `same` means the script-visible name is available; `adapted` means the name is routed through a WeKii bridge; `unavailable` means the name is intentionally exposed as `null` or is not registered because the host has no equivalent.
@@ -36,7 +36,7 @@ This is a compatibility inventory, not a promise that host-only capabilities are
 
 ## Function Groups
 
-The current WeKii namespace contains 124 script-visible functions. The `pl` bootstrap exposes 196 names. The current inventory is:
+The current WeKii namespace contains 146 script-visible functions. The `pl` bootstrap exposes 195 names. The current inventory is:
 
 | Group | WeKii | Compatibility |
 |---|---:|---|
@@ -47,12 +47,16 @@ The current WeKii namespace contains 124 script-visible functions. The `pl` boot
 | Message/contact/group/payment APIs | present | adapted |
 | File/config/dialog/menu APIs | present | adapted |
 | Image/video/finder download callbacks | present in host bridge | adapted where exposed by current namespace |
-| `downloadImage`, `downloadVideo` pl-style top-level aliases | not independently registered | use `wa`/`audio` bridge methods or existing download APIs |
-| `registerPlusMenu` | host bridge exists, top-level alias absent | adapted only through current menu API; requires signature audit |
-| `hookBefore` / `hookAfter` | `JavaHookApi` exists | class-level API available; top-level alias requires script callback signature audit |
-| `sendProtobufPacket` | runtime implementation exists outside `JavaEngine` | not yet exposed as a top-level JavaEngine function |
-| `startTransform` | media implementation exists outside `JavaEngine` | not yet exposed as a top-level JavaEngine function |
-| `uploadDeviceStep` and SNS/Protobuf host-only operations | absent or host-specific | unavailable unless a matching WeKii API is added |
+| `downloadImage` | absent | top-level URL download with `Consumer<File?>` callback added |
+| `downloadImages` | absent | list and list-plus-prefix URL download overloads added |
+| `downloadVideo` | host bridge supports URL/message overloads | URL/file-name overloads adapted; native WeChat message decryption remains unavailable |
+| `registerPlusMenu` | host bridge has native plus-menu dispatcher | callable degraded adapter registered in existing message-menu dispatcher; native plus UI unavailable |
+| `hookBefore` / `hookAfter` | `JavaHookApi` exists | top-level aliases added and delegated to `JavaHookApi` |
+| `sendProtobufPacket` | runtime implementation exists outside `JavaEngine` | all public overloads exposed; returns explicit unsupported result because WeKii has no transport runtime |
+| `startTransform` | media implementation exists outside `JavaEngine` | types `0/1/5/6/9` adapted through available WeKii codecs; AAC/M4A/FLAC/OGG-only types report structured error |
+| `uploadDeviceStep` | host service exists | adapted through `WeChatService.uploadDeviceStep` |
+
+| SNS/Protobuf host-only operations | absent or host-specific | unavailable; no matching WeKii runtime implementation |
 
 ## Callback Signatures
 
@@ -68,7 +72,8 @@ The legacy `any` callback overloads remain in `JavaEngine` for old scripts. New 
 
 ## Remaining Work
 
-1. Add typed top-level aliases only after matching each `pl` method signature to the existing WeKii bridge.
-2. Expose Protobuf/media transform functions only through their existing WeKii lifecycle and thread-safety contracts.
-3. Keep the BeanShell fork as the base and port individual parser/preprocessor patches with tests; do not replace the fork wholesale.
-4. Add runtime smoke scripts for class imports, callback construction, object-style HTTP, reflection, menu registration, and unavailable-capability behavior.
+1. Add a native WeKii Protobuf transport runtime before changing `sendProtobufPacket` from explicit unsupported results to real network dispatch.
+2. Add a native plus-menu hook/dispatcher before changing `registerPlusMenu` from message-menu fallback to the WeChat input-bar UI.
+3. Add native video-message metadata/decryption support before exposing `downloadVideo(Object message, ...)` with full `pl` semantics.
+4. Expand `startTransform` only when the corresponding codec is present in WeKii; currently common Silk/MP3 paths are adapted and unsupported types report structured errors.
+5. Keep the BeanShell fork as the base and add runtime smoke scripts for imports, callbacks, HTTP, reflection, menu fallback, media conversion, and unavailable-capability behavior.
