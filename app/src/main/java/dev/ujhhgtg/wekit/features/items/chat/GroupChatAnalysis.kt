@@ -853,7 +853,26 @@ private object GroupChatAnalysisEngine {
         }.getOrDefault(0)
         val history = scalar("SELECT COUNT(*) FROM message WHERE talker=?", arrayOf(talker))
         val today = scalar("SELECT COUNT(*) FROM message WHERE talker=? AND createTime>=?", arrayOf(talker, todayStart))
-        val todayUsers = scalar("SELECT COUNT(DISTINCT CASE WHEN isSend!=0 THEN ? ELSE CASE WHEN instr(content, char(10))>0 THEN substr(content,1,instr(content, char(10))-1) ELSE NULL END END) FROM message WHERE talker=? AND createTime>=?", arrayOf(WeApi.selfWxId, talker, todayStart))
+        // Reuse the same sender parser as load(); SQL substring extraction previously
+        // retained the ':' suffix and accepted malformed/system rows.
+        val todaySenders = mutableSetOf<String>()
+        WeDatabaseApi.rawQuery(
+            "SELECT content,isSend FROM message WHERE talker=? AND createTime>=?",
+            arrayOf(talker, todayStart),
+        ).use { cursor ->
+            val contentIndex = cursor.getColumnIndexOrThrow("content")
+            val sendIndex = cursor.getColumnIndexOrThrow("isSend")
+            while (cursor.moveToNext()) {
+                val senderId = if (cursor.getInt(sendIndex) != 0) {
+                    WeApi.selfWxId
+                } else {
+                    groupSenderRegex.find(cursor.getString(contentIndex).orEmpty())
+                        ?.groupValues?.get(1)?.trim().orEmpty()
+                }
+                if (senderId.isNotBlank()) todaySenders += senderId
+            }
+        }
+        val todayUsers = todaySenders.size
         val typeStats = linkedMapOf<String, Int>()
         WeDatabaseApi.rawQuery("SELECT type, COUNT(*) FROM message WHERE talker=? GROUP BY type", arrayOf(talker)).use { c ->
             while (c.moveToNext()) typeStats[messageTypeName(c.getInt(0))] = c.getInt(1)
