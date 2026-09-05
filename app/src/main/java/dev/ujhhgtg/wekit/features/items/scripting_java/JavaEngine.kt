@@ -1,7 +1,9 @@
 package dev.ujhhgtg.wekit.features.items.scripting_java
-
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+
 import android.os.Handler
 import android.os.Looper
 import bsh.BshMethod
@@ -2194,6 +2196,33 @@ object JavaEngine {
                 )
             })
 
+            setMethod(BshMethod("uploadVideo", arrayOf(BString)) { args ->
+                return@BshMethod postMomentVideoCompat("", args[0] as String, null, null)
+            })
+            setMethod(BshMethod("uploadVideo", arrayOf(org.json.JSONObject::class.java)) { args ->
+                val jo = args[0] as org.json.JSONObject
+                return@BshMethod postMomentVideoCompat(
+                    jo.optString("content", ""),
+                    jo.optString("videoPath", jo.optString("video", "")),
+                    jo.optString("sdkId", null),
+                    jo.optString("sdkAppName", null),
+                )
+            })
+            setMethod(BshMethod("uploadTextAndVideo", arrayOf(BString, BString)) { args ->
+                return@BshMethod postMomentVideoCompat(args[0] as String, args[1] as String, null, null)
+            })
+            setMethod(BshMethod("uploadTextAndVideo", arrayOf(BString, BString, BString, BString)) { args ->
+                return@BshMethod postMomentVideoCompat(args[0] as String, args[1] as String, args[2] as String, args[3] as String)
+            })
+            setMethod(BshMethod("uploadTextAndVideo", arrayOf(org.json.JSONObject::class.java)) { args ->
+                val jo = args[0] as org.json.JSONObject
+                return@BshMethod postMomentVideoCompat(
+                    jo.optString("content", ""),
+                    jo.optString("videoPath", jo.optString("video", "")),
+                    jo.optString("sdkId", null),
+                    jo.optString("sdkAppName", null),
+                )
+            })
             // === Network Queue and XML Messages ===
             setMethod(BshMethod("addToQueue", arrayOf(any)) {
                 WeNetSceneApi.sendNetScene(it[0])
@@ -2495,6 +2524,35 @@ object JavaEngine {
         val masked = if (k.equals("authorization", true) || k.equals("x-api-key", true) || k.equals("api-key", true) || k.equals("token", true)) "<redacted>" else v.take(80)
         "$k=$masked"
     } ?: "{}"
+
+    private fun postMomentVideoCompat(content: String, videoPath: String, sdkId: String?, sdkAppName: String?): Boolean {
+        val video = File(videoPath)
+        if (!video.isFile) return false
+        val thumb = File(KnownPaths.moduleCache.toFile(), "script-moment-thumb-${System.nanoTime()}.jpg")
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(video.absolutePath)
+            val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return false
+            thumb.parentFile?.mkdirs()
+            thumb.outputStream().use { output ->
+                if (!frame.compress(Bitmap.CompressFormat.JPEG, 90, output)) return false
+            }
+            WeMomentsApi.postTextAndVideo(
+                HostInfo.application,
+                content,
+                video.absolutePath,
+                thumb.absolutePath,
+                sdkId,
+                sdkAppName,
+            )
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "script moment video upload failed", e)
+            false
+        } finally {
+            retriever.release()
+            thumb.delete()
+        }
+    }
 
     private fun sendVoiceCompat(toUser: String, source: String, durationMs: Int): Boolean {
         val input = File(source)

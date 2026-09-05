@@ -36,7 +36,7 @@ This is a compatibility inventory, not a promise that host-only capabilities are
 
 ## Function Groups
 
-The current WeKii namespace contains 146 script-visible functions. The `pl` bootstrap exposes 195 names. The current inventory is:
+The current WeKii namespace contains 151 script-visible registration entries after the additive video adapters. The `pl` bootstrap exposes 195 names. The current inventory is:
 
 | Group | WeKii | Compatibility |
 |---|---:|---|
@@ -50,13 +50,17 @@ The current WeKii namespace contains 146 script-visible functions. The `pl` boot
 | `downloadImage` | absent | top-level URL download with `Consumer<File?>` callback added |
 | `downloadImages` | absent | list and list-plus-prefix URL download overloads added |
 | `downloadVideo` | host bridge supports URL/message overloads | URL/file-name overloads adapted; native WeChat message decryption remains unavailable |
+| `uploadVideo` | video and JSON overloads | `String` and `JSONObject` overloads adapted through `WeMomentsApi.postTextAndVideo`; generated first-frame thumbnail |
+| `uploadTextAndVideo` | text/video and JSON overloads | text/video overloads adapted through `WeMomentsApi.postTextAndVideo`; JSON path fields supported |
+| `uploadLivePhoto`, `uploadTextAndLivePhoto` | native live-photo media pipeline | unavailable; WeKii has mixed-media posting internals but no equivalent script bridge for all `pl` overloads |
 | `registerPlusMenu` | host bridge has native plus-menu dispatcher | callable degraded adapter registered in existing message-menu dispatcher; native plus UI unavailable |
 | `hookBefore` / `hookAfter` | `JavaHookApi` exists | top-level aliases added and delegated to `JavaHookApi` |
 | `sendProtobufPacket` | runtime implementation exists outside `JavaEngine` | all public overloads exposed; returns explicit unsupported result because WeKii has no transport runtime |
 | `startTransform` | media implementation exists outside `JavaEngine` | types `0/1/5/6/9` adapted through available WeKii codecs; AAC/M4A/FLAC/OGG-only types report structured error |
 | `uploadDeviceStep` | host service exists | adapted through `WeChatService.uploadDeviceStep` |
 
-| SNS/Protobuf host-only operations | absent or host-specific | unavailable; no matching WeKii runtime implementation |
+| SNS post/read APIs | WeKii has `WeMomentsApi` upload and timeline primitives | partially adapted; existing native WeKii SNS functionality is preserved, while some `pl` object/media overloads remain unexposed |
+| Protobuf transport host-only operations | `pl` has `ProtobufPacketRuntime` | unavailable; WeKii can queue already-constructed NetScene objects but cannot convert arbitrary JSON into a transport request |
 
 ## Callback Signatures
 
