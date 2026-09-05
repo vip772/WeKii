@@ -854,35 +854,41 @@ private object GroupChatAnalysisEngine {
         val history = scalar("SELECT COUNT(*) FROM message WHERE talker=?", arrayOf(talker))
         val today = scalar("SELECT COUNT(*) FROM message WHERE talker=? AND createTime>=?", arrayOf(talker, todayStart))
         val members = runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList())
-        val memberIds = members.map { it.wxId }.filter { it.isNotBlank() }.toSet()
         val memberAliases = buildMap {
             members.forEach { member ->
-                listOf(member.wxId, member.nickname, member.displayName)
+                listOf(member.wxId, member.nickname, member.displayName,
+                    runCatching { WeDatabaseApi.getGroupMemberDisplayName(talker, member.wxId) }.getOrDefault("")
+                )
                     .map { it.trim() }
                     .filter { it.isNotEmpty() }
                     .forEach { put(it, member.wxId) }
             }
         }
-        // Count stable member IDs, not raw content prefixes. The message table can
-        // contain wxid, nickname, or CRLF-prefixed sender forms interchangeably.
+        // The metric is the number of distinct speakers in this talker today.
+        // Member lookup only normalizes aliases; it must never filter out a speaker.
         val todaySenders = mutableSetOf<String>()
-        val senderPrefix = Regex("""^([^\r\n:]+):(?:\r?\n|$)""")
         WeDatabaseApi.rawQuery(
-            "SELECT content,isSend FROM message WHERE talker=? AND createTime>=?",
+            "SELECT content,isSend,type FROM message WHERE talker=? AND createTime>=?",
             arrayOf(talker, todayStart),
         ).use { cursor ->
             val contentIndex = cursor.getColumnIndexOrThrow("content")
             val sendIndex = cursor.getColumnIndexOrThrow("isSend")
+            val typeIndex = cursor.getColumnIndexOrThrow("type")
             while (cursor.moveToNext()) {
+                val type = cursor.getInt(typeIndex)
+                if (type == 10000 || type == 10002 || type == 10008) continue
                 val senderId = if (cursor.getInt(sendIndex) != 0) {
                     WeApi.selfWxId
                 } else {
-                    senderPrefix.find(cursor.getString(contentIndex).orEmpty())
-                        ?.groupValues?.get(1)?.trim()
-                        ?.let { memberAliases[it] }
-                        .orEmpty()
+                    val firstLine = cursor.getString(contentIndex).orEmpty()
+                        .substringBefore('\n').substringBefore('\r')
+                    val separator = firstLine.indexOf(':')
+                    if (separator <= 0) "" else {
+                        val prefix = firstLine.substring(0, separator).trim()
+                        memberAliases[prefix] ?: prefix
+                    }
                 }
-                if (senderId in memberIds || senderId == WeApi.selfWxId) todaySenders += senderId
+                if (senderId.isNotBlank()) todaySenders += senderId
             }
         }
         val todayUsers = todaySenders.size
