@@ -116,6 +116,16 @@ object JavaEngine {
         callbackAliases.remove(plugin.name)
     }
 
+    /**
+     * BeanShell in the host module can resolve the imported nested callback
+     * classes by their simple names, but not every version can resolve the
+     * Java source form PluginCallBack.HttpCallback. Keep this workaround
+     * local to the source being evaluated; never mutate the saved plugin.
+     */
+    private fun normalizeCallbackTypeNames(source: String): String = source
+        .replace("PluginCallBack.HttpCallback", "HttpCallback")
+        .replace("PluginCallBack.DownloadCallback", "DownloadCallback")
+
     fun executeAllOnLoad(scripts: Map<String, JavaPlugin>) {
         scripts.values.forEach { plugin ->
             BypassScriptsDrm.registerInterpreter(plugin.interpreter)
@@ -123,7 +133,7 @@ object JavaEngine {
                 clearCallbackAliases(plugin)
                 initPlugin(plugin)
                 pluginLog(plugin, "evaluating plugin")
-                plugin.interpreter.eval(plugin.content)
+                plugin.interpreter.eval(normalizeCallbackTypeNames(plugin.content))
                 pluginLog(plugin, "plugin evaluated successfully")
                 pluginLog(plugin, "namespace methods: " + plugin.interpreter.nameSpace.getMethods().joinToString { it.name })
 
