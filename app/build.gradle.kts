@@ -121,6 +121,9 @@ android {
 
         release {
             optimization.enable = true
+            optimization.keepRules {
+                files.add(file("plugin-api-rules.pro"))
+            }
             signingConfig = signingConfigs.getByName(if (foundKeystore) "release" else "debug")
         }
     }
