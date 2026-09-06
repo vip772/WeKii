@@ -40,6 +40,7 @@ class JavaEngineApiSurfaceTest {
         "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XposedBridge\")",
         "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\")",
         "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\\$MethodHookParam\")",
+        "setVariable(\"MethodHookParam\", methodHookParamClass)",
         "setVariable(\"MethodHookParamClass\", methodHookParamClass)",
         "BshMethod(\"hookReplace\", arrayOf(Member::class.java, Function::class.java))",
         "BshMethod(\"invokeOriginalMethod\", arrayOf(any))",
@@ -118,6 +119,14 @@ class JavaEngineApiSurfaceTest {
         additiveSignatureFragments.forEach { signature ->
             assertTrue(source.contains(signature), "Additive script signature is missing: $signature")
         }
+        assertTrue(
+            source.contains("chatFooter.lastText = \"\"") && source.contains("param.result = null"),
+            "Intercepted send-button callbacks must clear the editor and suppress native sending",
+        )
+        assertTrue(
+            source.contains("if (AudioUtils.anyToSilk(source, target)) 0 else -1"),
+            "pcmToSilk must retain the PL-compatible integer status contract",
+        )
     }
 
     @Test

@@ -118,7 +118,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
                 type = ChatFooter::class
             }.get()!! as ChatFooter
             val text = chatFooter.lastText
-            JavaEngine.executeAllOnClickSendBtn(scripts, this, text)
+            JavaEngine.executeAllOnClickSendBtn(scripts, this, chatFooter, text)
         }
 
         methodPayMsg.hookBefore {

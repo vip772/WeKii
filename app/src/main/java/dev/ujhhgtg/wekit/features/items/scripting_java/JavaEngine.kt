@@ -33,6 +33,7 @@ import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import android.graphics.drawable.ColorDrawable
 import androidx.compose.material3.Text
+import com.tencent.mm.pluginsdk.ui.chat.ChatFooter
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
@@ -177,12 +178,13 @@ object JavaEngine {
             }
         }
     }
-
     fun executeAllOnClickSendBtn(
         scripts: Map<String, JavaPlugin>,
         param: HookParam,
+        chatFooter: ChatFooter,
         text: String
     ) {
+
         scripts.values.forEach { plugin ->
             try {
                 val bshMethod = findScriptMethod(plugin, "onClickSendBtn", arrayOf(BString))
@@ -190,6 +192,7 @@ object JavaEngine {
                     val ifIntercept = invoke(arrayOf(text), plugin.interpreter)
                     WeLogger.i(TAG, "onClickSendBtn executed for script ${plugin.name}; ifIntercept=${ifIntercept}")
                     if (ifIntercept == true) {
+                        chatFooter.lastText = ""
                         param.result = null
                     }
                 }
@@ -399,6 +402,9 @@ object JavaEngine {
             xcMethodHookClass?.let { importClass(it.name) }
             methodHookParamClass?.let { importClass(it.name) }
             importPackage("de.robv.android.xposed")
+            setVariable("XposedBridge", xposedBridgeClass)
+            setVariable("XC_MethodHook", xcMethodHookClass)
+            setVariable("MethodHookParam", methodHookParamClass)
             setVariable("XposedBridgeClass", xposedBridgeClass)
             setVariable("XposedHelpersClass", xposedHelpersClass)
             setVariable("XC_MethodHookClass", xcMethodHookClass)
@@ -486,7 +492,7 @@ object JavaEngine {
             setMethod(BshMethod("pcmToSilk", arrayOf(BString, BString, int, int, int)) { a ->
                 val source = a[0] as String
                 val target = a[1] as String
-                runCatching { AudioUtils.anyToSilk(source, target) }.getOrDefault(false)
+                runCatching { if (AudioUtils.anyToSilk(source, target)) 0 else -1 }.getOrDefault(-1)
             })
             setMethod(BshMethod("autoToSilk", arrayOf(BString, BString, int)) { a ->
                 val source = a[0] as String; val target = a[1] as String
