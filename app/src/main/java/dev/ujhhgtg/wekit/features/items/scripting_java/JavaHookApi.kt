@@ -27,7 +27,9 @@ object JavaHookApi : ApiFeature() {
     fun hookBefore(member: Member, consumer: Consumer<HookParam>): HookHandle {
         val unhook = (member as Executable).hookBeforeDirectly {
             runCatching {
-                result = consumer.accept(this)
+                // A before hook must not replace the original method result. The
+                // callback can still mutate args/result explicitly through HookParam.
+                consumer.accept(this)
             }.onFailure { WeLogger.e(TAG, "failed to execute script hookBefore action") }
         }
         val handle = HookHandle(unhook)

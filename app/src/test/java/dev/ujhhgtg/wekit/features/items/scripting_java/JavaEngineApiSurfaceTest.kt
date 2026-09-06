@@ -37,6 +37,13 @@ class JavaEngineApiSurfaceTest {
     private val callbackImportFragments = setOf(
         "classManager.addClassLoader(ClassLoaders.MODULE)",
         "importClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\")",
+        "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XposedBridge\")",
+        "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\")",
+        "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\\$MethodHookParam\")",
+        "setVariable(\"MethodHookParamClass\", methodHookParamClass)",
+        "BshMethod(\"hookReplace\", arrayOf(Member::class.java, Function::class.java))",
+        "BshMethod(\"invokeOriginalMethod\", arrayOf(any))",
+        "callback.accept(msg)",
     )
 
     private val originalHookSignatures = setOf(
@@ -114,6 +121,15 @@ class JavaEngineApiSurfaceTest {
     }
 
     @Test
+    fun releaseRulesRetainScriptVisibleMessageModel() {
+        val rules = readPluginApiRules()
+        assertTrue(
+            rules.contains("-keep class dev.ujhhgtg.wekit.features.api.core.models.MessageInfo { *; }"),
+            "MessageInfo getters must remain stable for reflective PL-compatible scripts",
+        )
+    }
+
+    @Test
     fun unavailableHostCapabilitiesRemainExplicit() {
         val source = readJavaEngineSource()
 
@@ -132,6 +148,16 @@ class JavaEngineApiSurfaceTest {
         )
     }
 
+
+    private fun readPluginApiRules(): String {
+        val relative = Paths.get("app", "plugin-api-rules.pro")
+        val start = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
+        val candidates = generateSequence(start) { it.parent }
+            .map { it.resolve(relative) }
+            .toList()
+        return candidates.firstOrNull { Files.isRegularFile(it) }?.let { Files.readString(it) }
+            ?: error("Unable to locate plugin-api-rules.pro from $start")
+    }
 
     private fun readJavaEngineSource(): String {
         val relative = Paths.get(

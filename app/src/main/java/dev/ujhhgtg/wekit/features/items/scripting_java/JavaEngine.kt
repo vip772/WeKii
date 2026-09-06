@@ -42,8 +42,10 @@ import dev.ujhhgtg.wekit.features.api.ui.WeMomentsApi
 import dev.ujhhgtg.wekit.extensions.ScriptDepsPack
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.BshSnapshotDecompiler
+import dev.ujhhgtg.wekit.utils.HookHandle
 import dev.ujhhgtg.wekit.utils.HookParam
 import dev.ujhhgtg.wekit.utils.HostInfo
+import dev.ujhhgtg.wekit.utils.invokeOriginalMethod
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.getSystemService
 import dev.ujhhgtg.wekit.utils.android.getTopMostActivity
@@ -380,9 +382,27 @@ object JavaEngine {
             setVariable("dexKitBridge", null)
             setVariable("dexFinder", null)
             setVariable("dexBridgeHolder", null)
-            setVariable("XposedBridgeClass", null)
-            setVariable("XposedHelpersClass", null)
-            setVariable("XC_MethodHookClass", null)
+            val xposedBridgeClass = runCatching {
+                ClassLoaders.HYBRID.loadClass("de.robv.android.xposed.XposedBridge")
+            }.getOrNull()
+            val xposedHelpersClass = runCatching {
+                ClassLoaders.HYBRID.loadClass("de.robv.android.xposed.XposedHelpers")
+            }.getOrNull()
+            val xcMethodHookClass = runCatching {
+                ClassLoaders.HYBRID.loadClass("de.robv.android.xposed.XC_MethodHook")
+            }.getOrNull()
+            val methodHookParamClass = runCatching {
+                ClassLoaders.HYBRID.loadClass("de.robv.android.xposed.XC_MethodHook\$MethodHookParam")
+            }.getOrNull()
+            xposedBridgeClass?.let { importClass(it.name) }
+            xposedHelpersClass?.let { importClass(it.name) }
+            xcMethodHookClass?.let { importClass(it.name) }
+            methodHookParamClass?.let { importClass(it.name) }
+            importPackage("de.robv.android.xposed")
+            setVariable("XposedBridgeClass", xposedBridgeClass)
+            setVariable("XposedHelpersClass", xposedHelpersClass)
+            setVariable("XC_MethodHookClass", xcMethodHookClass)
+            setVariable("MethodHookParamClass", methodHookParamClass)
             val scriptApi = nameSpace.getThis(plugin.interpreter)
             setVariable("bridge", scriptApi)
             setVariable("wa", scriptApi)
@@ -391,6 +411,28 @@ object JavaEngine {
             setVariable("httpClient", scriptApi)
             setVariable("audio", scriptApi)
             setVariable("audioBridge", scriptApi)
+
+            // ===== Hook compatibility =====
+            // Keep the script-facing hook contract aligned with Xposed: before/after
+            // callbacks mutate HookParam explicitly, while replace callbacks return
+            // the replacement result and may invoke the original method themselves.
+            setMethod(BshMethod("hookBefore", arrayOf(Member::class.java, Consumer::class.java)) { args ->
+                JavaHookApi.hookBefore(args[0] as Member, args[1] as Consumer<HookParam>)
+            })
+            setMethod(BshMethod("hookAfter", arrayOf(Member::class.java, Consumer::class.java)) { args ->
+                JavaHookApi.hookAfter(args[0] as Member, args[1] as Consumer<HookParam>)
+            })
+            setMethod(BshMethod("hookReplace", arrayOf(Member::class.java, Function::class.java)) { args ->
+                JavaHookApi.hookReplace(args[0] as Member, args[1] as Function<HookParam, Any?>)
+            })
+            setMethod(BshMethod("unhook", arrayOf(HookHandle::class.java)) { args ->
+                JavaHookApi.unhook(args[0] as HookHandle)
+                null
+            })
+            setMethod(BshMethod("invokeOriginalMethod", arrayOf(any)) { args ->
+                (args[0] as HookParam).invokeOriginalMethod()
+            })
+
             // ===== Host Info =====
             setVariable("hostContext", HostInfo.application)
             setVariable("hostVerName", HostInfo.versionName)
@@ -1665,6 +1707,15 @@ object JavaEngine {
                     return@BshMethod JavaHookApi.hookReplace(member, function)
                 })
 
+            // invokeOriginalMethod(param) → invoke the real method and return its result.
+            // This is required when a script replaces a non-void method.
+            setMethod(
+                BshMethod(
+                    "invokeOriginalMethod", arrayOf(any)
+                ) {
+                    val param = it[0] as HookParam
+                    runCatchingBsh("invokeOriginalMethod") { param.invokeOriginalMethod() }
+                })
             // unhook(handle) → remove a hook
             setMethod(
                 BshMethod(
