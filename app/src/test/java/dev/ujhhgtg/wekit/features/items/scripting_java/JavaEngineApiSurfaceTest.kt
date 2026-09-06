@@ -92,8 +92,10 @@ class JavaEngineApiSurfaceTest {
             "Plugin source is not evaluated through the compatibility normalizer",
         )
         assertTrue(
-            source.contains(".replace(\"PluginCallBack.HttpCallback\", \"HttpCallback\")") &&
-                source.contains(".replace(\"PluginCallBack.DownloadCallback\", \"DownloadCallback\")"),
+            source.contains("PluginCallBack.HttpCallback") &&
+                source.contains("PluginCallBack\\$HttpCallback") &&
+                source.contains("PluginCallBack.DownloadCallback") &&
+                source.contains("PluginCallBack\\$DownloadCallback"),
             "Nested callback type aliases are incomplete",
         )
         originalHookSignatures.forEach { signature ->

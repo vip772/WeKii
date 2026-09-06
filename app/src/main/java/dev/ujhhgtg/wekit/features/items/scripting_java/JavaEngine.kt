@@ -123,8 +123,14 @@ object JavaEngine {
      * local to the source being evaluated; never mutate the saved plugin.
      */
     private fun normalizeCallbackTypeNames(source: String): String = source
-        .replace("PluginCallBack.HttpCallback", "HttpCallback")
-        .replace("PluginCallBack.DownloadCallback", "DownloadCallback")
+        .replace(
+            "PluginCallBack.HttpCallback",
+            "MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback",
+        )
+        .replace(
+            "PluginCallBack.DownloadCallback",
+            "MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback",
+        )
 
     fun executeAllOnLoad(scripts: Map<String, JavaPlugin>) {
         scripts.values.forEach { plugin ->
