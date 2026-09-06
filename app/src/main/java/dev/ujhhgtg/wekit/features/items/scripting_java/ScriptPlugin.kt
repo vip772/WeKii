@@ -26,6 +26,8 @@ import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
+import dev.ujhhgtg.wekit.extensions.ExtensionPackDialogs
+import dev.ujhhgtg.wekit.extensions.ScriptDepsPack
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.content.m3.SwitchWidget
@@ -167,9 +169,13 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
             }
         }
 
+        if (!ScriptDepsPack.isInstalled()) {
+            getTopMostActivity(allowPaused = true)?.let { activity ->
+                ExtensionPackDialogs.suggestInstall(activity, ScriptDepsPack)
+            }
+        }
 
     }
-
     override fun onClick(context: ComponentActivity) {
         val entries = listScriptEntries()
         showComposeDialog(context) {
