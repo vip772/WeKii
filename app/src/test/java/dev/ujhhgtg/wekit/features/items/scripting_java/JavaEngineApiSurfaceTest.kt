@@ -83,13 +83,20 @@ class JavaEngineApiSurfaceTest {
         callbackImportFragments.forEach { signature ->
             assertTrue(source.contains(signature), "Nested callback import is missing: $signature")
         }
-        assertTrue(
-            source.contains("private fun normalizeCallbackTypeNames(source: String): String"),
-            "Nested callback source compatibility normalizer is missing",
+        val strongCallbackSignatures = listOf(
+            "arrayOf(BString, Map::class.java, httpCallbackClass)",
+            "arrayOf(BString, Map::class.java, java.lang.Long.TYPE, httpCallbackClass)",
+            "arrayOf(BString, Map::class.java, Map::class.java, httpCallbackClass)",
+            "arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, httpCallbackClass)",
+            "arrayOf(BString, BString, Map::class.java, downloadCallbackClass)",
+            "arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, downloadCallbackClass)",
         )
+        strongCallbackSignatures.forEach { signature ->
+            assertTrue(source.contains(signature), "Strong callback overload is missing: $signature")
+        }
         assertTrue(
-            source.contains("plugin.interpreter.eval(normalizeCallbackTypeNames(plugin.content))"),
-            "Plugin source is not evaluated through the compatibility normalizer",
+            source.contains("ClassLoaders.MODULE.loadClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\\$HttpCallback\")"),
+            "HttpCallback must be resolved from the module class loader",
         )
         assertTrue(
             source.contains("PluginCallBack.HttpCallback") &&

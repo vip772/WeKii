@@ -116,22 +116,6 @@ object JavaEngine {
         callbackAliases.remove(plugin.name)
     }
 
-    /**
-     * BeanShell in the host module can resolve the imported nested callback
-     * classes by their simple names, but not every version can resolve the
-     * Java source form PluginCallBack.HttpCallback. Keep this workaround
-     * local to the source being evaluated; never mutate the saved plugin.
-     */
-    private fun normalizeCallbackTypeNames(source: String): String = source
-        .replace(
-            "PluginCallBack.HttpCallback",
-            "MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback",
-        )
-        .replace(
-            "PluginCallBack.DownloadCallback",
-            "MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback",
-        )
-
     fun executeAllOnLoad(scripts: Map<String, JavaPlugin>) {
         scripts.values.forEach { plugin ->
             BypassScriptsDrm.registerInterpreter(plugin.interpreter)
@@ -139,7 +123,7 @@ object JavaEngine {
                 clearCallbackAliases(plugin)
                 initPlugin(plugin)
                 pluginLog(plugin, "evaluating plugin")
-                plugin.interpreter.eval(normalizeCallbackTypeNames(plugin.content))
+                plugin.interpreter.eval(plugin.content)
                 pluginLog(plugin, "plugin evaluated successfully")
                 pluginLog(plugin, "namespace methods: " + plugin.interpreter.nameSpace.getMethods().joinToString { it.name })
 
@@ -1806,6 +1790,42 @@ object JavaEngine {
                     client.newCall(req).execute().use { r -> val text = r.body.string(); pluginLog(plugin, "HTTP callback response status=${r.code} bytes=${text.toByteArray().size} body=${text.take(500)}"); legacyHttpCallback(callback, r.code, text, null) }
                 }.onFailure { legacyHttpCallback(callback, 0, null, it as? Exception ?: Exception(it)) } }
             })
+            // Strong callback overloads: BeanShell uses these signatures while compiling
+            // anonymous PluginCallBack.HttpCallback/DownloadCallback instances.
+            val httpCallbackClass = runCatching {
+                ClassLoaders.MODULE.loadClass("me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback")
+            }.getOrElse {
+                Class.forName("me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback")
+            }
+            val downloadCallbackClass = runCatching {
+                ClassLoaders.MODULE.loadClass("me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback")
+            }.getOrElse {
+                Class.forName("me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback")
+            }
+            fun delegate(name: String, args: Array<Any?>, signature: Array<Class<*>>) {
+                val method = nameSpace.getMethod(name, signature)
+                    ?: error("compatibility method not registered: $name")
+                method.invoke(args, plugin.interpreter)
+            }
+            setMethod(BshMethod("get", arrayOf(BString, Map::class.java, httpCallbackClass)) { args ->
+                delegate("get", args, arrayOf(BString, Map::class.java, any)); null
+            })
+            setMethod(BshMethod("get", arrayOf(BString, Map::class.java, java.lang.Long.TYPE, httpCallbackClass)) { args ->
+                delegate("get", args, arrayOf(BString, Map::class.java, java.lang.Long.TYPE, any)); null
+            })
+            setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, httpCallbackClass)) { args ->
+                delegate("post", args, arrayOf(BString, Map::class.java, Map::class.java, any)); null
+            })
+            setMethod(BshMethod("post", arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, httpCallbackClass)) { args ->
+                delegate("post", args, arrayOf(BString, Map::class.java, Map::class.java, java.lang.Long.TYPE, any)); null
+            })
+            setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, downloadCallbackClass)) { args ->
+                delegate("download", args, arrayOf(BString, BString, Map::class.java, any)); null
+            })
+            setMethod(BshMethod("download", arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, downloadCallbackClass)) { args ->
+                delegate("download", args, arrayOf(BString, BString, Map::class.java, java.lang.Long.TYPE, any)); null
+            })
+
             // pl-compatible URL media downloads. These are separate from download()
             // because pl exposes a callback-oriented URL API as wa.downloadImage().
             setMethod(BshMethod("downloadImage", arrayOf(BString, Consumer::class.java)) { args ->
