@@ -42,7 +42,6 @@ import dev.ujhhgtg.wekit.features.api.ui.WeMomentsApi
 import dev.ujhhgtg.wekit.extensions.ScriptDepsPack
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.BshSnapshotDecompiler
-import dev.ujhhgtg.wekit.utils.HookHandle
 import dev.ujhhgtg.wekit.utils.HookParam
 import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.utils.invokeOriginalMethod
@@ -67,6 +66,7 @@ import me.hd.wauxv.data.bean.ContactLabelBean
 import me.hd.wauxv.data.bean.MsgInfoBean
 import me.hd.wauxv.data.bean.info.FriendInfo
 import me.hd.wauxv.data.bean.info.GroupInfo
+import me.hd.wauxv.hook.HookHandle
 import me.hd.wauxv.plugin.api.callback.PluginCallBack
 import org.json.JSONArray
 import java.io.File
