@@ -321,6 +321,8 @@
     <string name="extensions_pack_state_not_installed">未安装</string>
     <string name="extensions_pack_state_update_available">可更新: %1$s → %2$s</string>
     <string name="extensions_pack_state_failed">失败: %1$s</string>
+    <string name="extensions_pack_state_failed_title">下载失败</string>
+    <string name="extensions_pack_state_failed_detail">%1$s 下载失败：\n%2$s</string>
     <string name="extensions_pack_download">下载</string>
     <string name="extensions_pack_update">更新</string>
     <string name="extensions_pack_retry">重试</string>

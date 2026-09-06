@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -120,6 +121,10 @@ private fun ExtensionsRoot(autoPackId: String?, autoDownload: Boolean, onFinish:
 private fun PackGroup(pack: ExtensionPack) {
     val state by ExtensionPacks.stateFlow(pack).collectAsState()
     var confirmDelete by remember { mutableStateOf(false) }
+    var failureReason by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state) {
+        failureReason = (state as? Failed)?.reason
+    }
     val context = LocalContext.current
     val localizedContext = LocalWeKitLocalizedContext.current
 
@@ -192,6 +197,19 @@ private fun PackGroup(pack: ExtensionPack) {
                 }
             }
         }
+    }
+
+    failureReason?.let { reason ->
+        AlertDialog(
+            onDismissRequest = { failureReason = null },
+            title = { Text(stringResource(R.string.extensions_pack_state_failed_title)) },
+            text = { Text(stringResource(R.string.extensions_pack_state_failed_detail, stringResource(pack.nameRes), reason)) },
+            confirmButton = {
+                TextButton(onClick = { failureReason = null }) {
+                    Text(stringResource(R.string.dialog_confirm))
+                }
+            },
+        )
     }
 
     if (confirmDelete) {
