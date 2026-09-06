@@ -35,8 +35,8 @@ class JavaEngineApiSurfaceTest {
     )
 
     private val callbackImportFragments = setOf(
-        "importClass(\"MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\\$HttpCallback\")",
-        "importClass(\"MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\\$DownloadCallback\")",
+        "classManager.addClassLoader(ClassLoaders.MODULE)",
+        "importClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\")",
     )
 
     private val originalHookSignatures = setOf(
@@ -95,8 +95,8 @@ class JavaEngineApiSurfaceTest {
             assertTrue(source.contains(signature), "Strong callback overload is missing: $signature")
         }
         assertTrue(
-            source.contains("ClassLoaders.MODULE.loadClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\\$HttpCallback\")"),
-            "HttpCallback must be resolved from the module class loader",
+            source.contains("setVariable(\"PluginCallBack\", PluginCallBack::class.java)"),
+            "PluginCallBack must be bound as the real outer Class",
         )
         assertTrue(
             source.contains("PluginCallBack.HttpCallback") &&

@@ -65,6 +65,7 @@ import me.hd.wauxv.data.bean.ContactLabelBean
 import me.hd.wauxv.data.bean.MsgInfoBean
 import me.hd.wauxv.data.bean.info.FriendInfo
 import me.hd.wauxv.data.bean.info.GroupInfo
+import me.hd.wauxv.plugin.api.callback.PluginCallBack
 import org.json.JSONArray
 import java.io.File
 import java.io.InputStream
@@ -295,6 +296,7 @@ object JavaEngine {
 
         val classManager = interpreter.classManager
         classManager.setClassLoader(ClassLoaders.HYBRID)
+        classManager.addClassLoader(ClassLoaders.MODULE)
         ScriptDepsPack.classLoader()?.let { classManager.addClassLoader(it) }
 
         val nameSpace = interpreter.nameSpace
@@ -342,12 +344,10 @@ object JavaEngine {
             importClass("me.hd.wauxv.data.bean.info.FriendInfo")
             importClass("me.hd.wauxv.data.bean.info.GroupInfo")
             importClass("me.hd.wauxv.data.bean.PayMsgBean")
-            // pl-compatible public callback API. Use the module route explicitly so
-            // BeanShell resolves the class from the same loader that owns this APK.
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack")
-            // BeanShell resolves nested JVM types by their binary `$` name.
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$HttpCallback")
-            importClass("MODULE.me.hd.wauxv.plugin.api.callback.PluginCallBack\$DownloadCallback")
+            // PL imports the outer callback class by its Java name. The module loader is
+            // registered on the interpreter, so nested types remain addressable as
+            // PluginCallBack.HttpCallback and PluginCallBack.DownloadCallback.
+            importClass("me.hd.wauxv.plugin.api.callback.PluginCallBack")
             importPackage("me.hd.wauxv.plugin.api.callback")
             importPackage("dev.ujhhgtg.wekit.features.api.core")
             importPackage("dev.ujhhgtg.wekit.features.api.ui")
@@ -355,6 +355,9 @@ object JavaEngine {
             // These aliases are intentionally bound to existing WeKii objects. They do
             // not introduce a second network or message implementation.
             setVariable("context", HostInfo.application)
+            // Bind the actual outer callback Class so BlockNameSpace/anonymous-class
+            // resolution can reach PluginCallBack.HttpCallback without name rewriting.
+            setVariable("PluginCallBack", PluginCallBack::class.java)
             setVariable("classLoader", ClassLoaders.HYBRID)
             setVariable("isAppBrandProcess", false)
             // Keep pl's reflective/runtime names available. These are real host classes;
