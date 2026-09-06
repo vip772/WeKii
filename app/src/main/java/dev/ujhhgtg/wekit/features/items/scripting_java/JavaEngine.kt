@@ -2392,6 +2392,17 @@ object JavaEngine {
             })
             // WeKii has no plus-menu dispatcher. Registering through the existing message
             // menu keeps the API callable while making the degraded behavior explicit.
+            fun syncMenuConversation(context: WeChatMessageContextMenuApi.ChattingContext) {
+                runCatching {
+                    val talker = WeMessageApi.methodChattingContextGetTalker.method.invoke(context.instance) as? String
+                    if (!talker.isNullOrEmpty()) {
+                        WeCurrentConversationApi.value = talker
+                    }
+                }.onFailure {
+                    pluginLog(plugin, "failed to resolve message menu conversation: ${it.message}")
+                }
+            }
+
             fun registerCompatPlusMenu(title: String, callback: Consumer<Any?>): Int {
                 val menuId = ("compat_plus_" + plugin.name + "_" + title).hashCode()
                 val provider = object : WeChatMessageContextMenuApi.IMenuItemsProvider {
@@ -2401,7 +2412,10 @@ object JavaEngine {
                         drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
                         imageVector = MaterialSymbols.Outlined.Info,
                         isSupported = { true },
-                        onClick = { _, _, message -> callback.accept(message) }
+                        onClick = { _, context, message ->
+                            syncMenuConversation(context)
+                            callback.accept(message)
+                        }
                     ))
                 }
                 unregisterPluginMenu(plugin.name)
@@ -2499,7 +2513,10 @@ object JavaEngine {
                     override fun getMenuItems() = listOf(WeChatMessageContextMenuApi.MenuItem(
                         id = menuId, text = title, drawable = ColorDrawable(android.graphics.Color.TRANSPARENT),
                         imageVector = MaterialSymbols.Outlined.Info, isSupported = { true },
-                        onClick = { _, _, msg -> callback.accept(msg) }
+                        onClick = { _, context, msg ->
+                            syncMenuConversation(context)
+                            callback.accept(msg)
+                        }
                     ))
                 }
                 unregisterPluginMenu(plugin.name)
@@ -2522,6 +2539,7 @@ object JavaEngine {
                             imageVector = MaterialSymbols.Outlined.Info,
                             isSupported = { true },
                             onClick = { view, context, msg ->
+                                syncMenuConversation(context)
                                 runCatching { callback.accept(arrayOf(view, context, msg)) }
                                     .onFailure { WeLogger.e(TAG, "plugin menu callback failed for ${plugin.name}", it) }
                             },
