@@ -39,7 +39,7 @@ class JavaEngineApiSurfaceTest {
         "importClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\")",
         "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XposedBridge\")",
         "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\")",
-        "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\$MethodHookParam\")",
+        "ClassLoaders.HYBRID.loadClass(\"de.robv.android.xposed.XC_MethodHook\\\$MethodHookParam\")",
         "setVariable(\"MethodHookParam\", methodHookParamClass)",
         "setVariable(\"MethodHookParamClass\", methodHookParamClass)",
         "BshMethod(\"hookReplace\", arrayOf(Member::class.java, Function::class.java))",
@@ -108,9 +108,9 @@ class JavaEngineApiSurfaceTest {
         )
         assertTrue(
             source.contains("PluginCallBack.HttpCallback") &&
-                source.contains("PluginCallBack\$HttpCallback") &&
+                source.contains("PluginCallBack\\\$HttpCallback") &&
                 source.contains("PluginCallBack.DownloadCallback") &&
-                source.contains("PluginCallBack\$DownloadCallback"),
+                source.contains("PluginCallBack\\\$DownloadCallback"),
             "Nested callback type aliases are incomplete",
         )
         originalHookSignatures.forEach { signature ->
