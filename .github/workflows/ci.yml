@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - dev
-      - 'integration/**'
     paths-ignore:
       - '**/*.txt'
       - '.editorconfig'
@@ -142,24 +141,11 @@ jobs:
           cp -v "$apk" dist/apk/
           echo "Collected APKs:"
           ls -1 dist/apk
-      - name: Collect mappings
-        run: |
-          mkdir -p dist/mapping
-          mapping="app/build/outputs/mapping/standardRelease/mapping.txt"
-          cp -v "$mapping" dist/mapping/mapping-standardRelease.txt
-          ls -1 dist/mapping
-
-      - name: Upload Release APKs
+      - name: Upload Release APK
         uses: actions/upload-artifact@v7
         with:
           name: wekit-apk
-          path: dist/apk/*.apk
-
-      - name: Upload Release Obfuscation Mapping
-        uses: actions/upload-artifact@v7
-        with:
-          name: wekit-mapping
-          path: dist/mapping/*.txt
+          path: dist/apk/app-standard-release.apk
 
   dex-test:
     runs-on: ubuntu-latest
@@ -269,8 +255,8 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload Dex resolution reports
-        if: always()
+      - name: Upload Dex resolution reports on failure
+        if: always() && steps.dex-resolution.outputs.status != '0'
         uses: actions/upload-artifact@v7
         with:
           name: wekit-dex-test-reports
