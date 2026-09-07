@@ -1,3 +1,4 @@
+@file:Suppress("AvoidDuplicateDependencies")
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -53,6 +54,10 @@ android {
         buildConfigField("String", "COMMIT_HASH", "\"${gitHash}\"")
         buildConfigField("String", "TAG", "\"WeKit\"")
         buildConfigField("long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
+        buildConfigField("long", "PYTHON_SYNC_HOOK_BUDGET_MS", "${libs.versions.pythonRuntimeSyncHookBudgetMs.get()}L")
+        buildConfigField("long", "PYTHON_TASK_DRAIN_TIMEOUT_MS", "${libs.versions.pythonRuntimeTaskDrainTimeoutMs.get()}L")
+        buildConfigField("long", "PYTHON_MAX_MANIFEST_BYTES", "${libs.versions.pythonRuntimeMaxManifestBytes.get()}L")
+        buildConfigField("long", "PYTHON_MAX_PLUGIN_FILE_BYTES", "${libs.versions.pythonRuntimeMaxPluginFileBytes.get()}L")
     }
 
     splits {
@@ -121,6 +126,7 @@ android {
 
         release {
             optimization.enable = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             optimization.keepRules {
                 files.add(file("plugin-api-rules.pro"))
             }
@@ -134,6 +140,9 @@ android {
     }
 
     packaging {
+        dex {
+            useLegacyPackaging = true
+        }
         jniLibs {
             useLegacyPackaging = true
         }
@@ -141,7 +150,11 @@ android {
             "kotlin/**",
             "**.bin",
             "kotlin-tooling-metadata.json",
-            "META-INF/INDEX.LIST"
+            "META-INF/INDEX.LIST",
+            // Monet reads host resource tables with default framework loading disabled.
+            "frameworks/android/**",
+            // Monet signs with RSA; Picnic's post-quantum lookup tables are unused.
+            "org/bouncycastle/pqc/crypto/picnic/**"
         )
         resources.merges += listOf(
             "META-INF/io.netty.versions.properties",
@@ -179,6 +192,20 @@ tasks.withType<KotlinCompile> {
 val adbProvider = androidComponents.sdkComponents.adb
 androidComponents {
     onVariants { variant ->
+        val generateZygiskResources = tasks.register<GenerateZygiskResourcesTask>(
+            "generate${variant.name.replaceFirstChar { it.uppercase() }}ZygiskResources"
+        ) {
+            templateDir.set(rootProject.layout.projectDirectory.dir("wekit-zygisk/template"))
+            versionCode.set(variant.outputs.single().versionCode)
+            versionName.set(variant.outputs.single().versionName)
+            variantName.set(variant.name)
+            outputDir.set(layout.buildDirectory.dir("generated/zygiskResources/${variant.name}"))
+        }
+        variant.sources.resources!!.addGeneratedSourceDirectory(
+            generateZygiskResources,
+            GenerateZygiskResourcesTask::outputDir
+        )
+
         val kotlinSources = variant.sources.kotlin ?: return@onVariants
 
         kotlinSources.addGeneratedSourceDirectory(
@@ -234,6 +261,22 @@ val scriptDeps = configurations.create("scriptDeps") {
     isCanBeConsumed = false
 }
 
+val arsclibSource = configurations.create("arsclibSource") {
+    isCanBeResolved = true
+    isCanBeConsumed = false
+    isTransitive = false
+}
+
+// ARSCLib bundles desktop copies of Android/XML Pull APIs. If supplied to R8 as
+// program classes, even AttributeSet::class in host constructor queries gets
+// rewritten to the bundled (obfuscated) copy and no longer matches Android.
+val prepareAndroidArsclib = tasks.register<Jar>("prepareAndroidArsclib") {
+    from(provider { arsclibSource.map { zipTree(it) } })
+    exclude("android/**", "org/xmlpull/v1/**")
+    archiveFileName.set("arsclib-android.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("generated/arsclib"))
+}
+
 // R8/D8 fat jar, resolved through the project repositories (google()).
 val r8Tool = configurations.detachedConfiguration(
     dependencies.create("com.android.tools:r8:8.7.18"),
@@ -261,6 +304,7 @@ ksp {
 }
 
 dependencies {
+    implementation(project(":libs:python-runtime-api"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.dynamicanimation)
@@ -282,6 +326,7 @@ dependencies {
     implementation(libs.miuix.blur)
     implementation(libs.miuix.shader)
     implementation(libs.miuix.nav)
+    implementation(libs.scripta.editor)
     implementation(libs.materialkolor)
     implementation(libs.coil)
     implementation(libs.coil.compose)
@@ -297,7 +342,11 @@ dependencies {
     implementation(libs.mmkv)
 
     implementation(project(":libs:common:bsh"))
-    implementation(project(":libs:monet-generator-api"))
+    add(arsclibSource.name, libs.arsclib)
+    implementation(files(prepareAndroidArsclib))
+    implementation(libs.apksig)
+    implementation(libs.bouncycastle.prov)
+    implementation(libs.bouncycastle.pkix)
 
     compileOnly(libs.legacyxposed.api)
     compileOnly(libs.libxposed.api)
@@ -307,13 +356,7 @@ dependencies {
     implementation(project(":libs:common:reflekt"))
     implementation(libs.libsu.core)
     implementation(libs.dexmaker)
-//    implementation(libs.arsclib)
-//    implementation(libs.apksig)
-//    implementation(libs.bouncycastle.prov)
-//    implementation(libs.bouncycastle.pkix)
-    @Suppress("AvoidDuplicateDependencies")
     implementation(project(":libs:common:annotation-scanner"))
-    @Suppress("AvoidDuplicateDependencies")
     ksp(project(":libs:common:annotation-scanner"))
 
     implementation(libs.okhttp3.okhttp)
@@ -354,7 +397,6 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(project(":libs:common:stubs"))
-    testImplementation(project(":extensions:monet-generator"))
     testImplementation(libs.legacyxposed.api)
     testImplementation(libs.libxposed.api)
     testImplementation(libs.sqlite.jdbc)
@@ -372,13 +414,15 @@ val dexTestWorkerProperties = listOf(
     "wekit.dexTest.buildTag",
     "wekit.dexTest.isGooglePlay",
     "wekit.dexTest.features",
+    "wekit.dexTest.workers",
 )
 val dexTestWorker = providers.gradleProperty("dexTestWorker").map(String::toBoolean).orElse(false)
 val monetCorpus = providers.gradleProperty("wekit.monetCorpus").map(String::toBoolean).orElse(false)
 
 tasks.withType<Test>().configureEach {
     systemProperty("wekit.monetCorpus", monetCorpus.get())
-    if (monetCorpus.get()) maxHeapSize = "4g"
+    // Monet resource-graph tests load complete host APKs.
+    maxHeapSize = "4g"
     if (dexTestWorker.get()) {
         filter {
             includeTestsMatching("dev.ujhhgtg.wekit.dextest.DexTestWorkerTest")
@@ -397,13 +441,6 @@ tasks.withType<Test>().configureEach {
 // markwon conflict
 configurations.all {
     exclude(group = "org.jetbrains", module = "annotations-java5")
-
-//    resolutionStrategy {
-//        force("androidx.compose.ui:ui:1.12.0-beta01")
-//        force("androidx.compose.ui:ui-android:1.12.0-beta01")
-//        force("androidx.compose.material3:material3:1.5.0-alpha21")
-//        force("androidx.compose.material3:material3-android:1.5.0-alpha21")
-//    }
 }
 
 tasks.withType<KotlinJvmCompile>().configureEach {

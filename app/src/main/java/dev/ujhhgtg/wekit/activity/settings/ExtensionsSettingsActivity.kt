@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 
 package dev.ujhhgtg.wekit.activity.settings
 
@@ -15,8 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -45,6 +42,7 @@ import dev.ujhhgtg.wekit.extensions.ExtensionPackState.NotInstalled
 import dev.ujhhgtg.wekit.extensions.ExtensionPackState.UpdateAvailable
 import dev.ujhhgtg.wekit.extensions.ExtensionPackState.Verifying
 import dev.ujhhgtg.wekit.extensions.ExtensionPacks
+import dev.ujhhgtg.wekit.extensions.PythonRuntimePack
 import dev.ujhhgtg.wekit.i18n.LocaleResourceMode
 import dev.ujhhgtg.wekit.i18n.LocalWeKitLocalizedContext
 import dev.ujhhgtg.wekit.i18n.WeKitLocaleProvider
@@ -189,7 +187,7 @@ private fun PackGroup(pack: ExtensionPack) {
                         )
                         OutlinedButton(
                             onClick = { confirmDelete = true },
-                            enabled = s is Installed || s is UpdateAvailable,
+                            enabled = (s is Installed || s is UpdateAvailable) && !pack.isInUse(),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             modifier = Modifier.weight(1f),
                         ) { Text(stringResource(R.string.extensions_pack_delete)) }
@@ -246,7 +244,11 @@ private fun descriptionLine(pack: ExtensionPack, state: ExtensionPackState): Str
         is UpdateAvailable -> stringResource(R.string.extensions_pack_state_update_available, state.installedVersion, state.latestVersion)
         is Failed -> stringResource(R.string.extensions_pack_state_failed, state.reason)
     }
-    return "$base\n$status"
+    val mountedVersion = if (pack === PythonRuntimePack) PythonRuntimePack.mounted()?.manifest?.version else null
+    val restart = if (
+        mountedVersion != null && mountedVersion != PythonRuntimePack.installedManifest()?.version
+    ) "\n${stringResource(R.string.extensions_pack_python_restart_required)}" else ""
+    return "$base\n$status$restart"
 }
 
 private fun formatBytes(bytes: Long): String {

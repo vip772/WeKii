@@ -1,4 +1,9 @@
 package dev.ujhhgtg.wekit.features.items.scripting_java
+
+import dev.ujhhgtg.wekit.utils.fs.copyFrom
+import kotlin.io.path.outputStream
+import kotlin.io.path.readBytes
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.graphics.Bitmap
@@ -75,7 +80,6 @@ import java.io.InputStream
 import java.lang.reflect.Member
 import java.lang.reflect.Proxy
 import java.nio.ByteBuffer
-import java.nio.file.Files
 import java.util.Properties
 import java.util.function.Consumer
 import java.util.function.Function
@@ -853,7 +857,7 @@ object JavaEngine {
                     } else {
                         plugin.dir.resolve(path).toFile().canonicalPath
                     }
-                    val dexBytes = Files.readAllBytes(File(resolved).toPath())
+                    val dexBytes = File(resolved).toPath().readBytes()
                     val loader = InMemoryDexClassLoader(
                         ByteBuffer.wrap(dexBytes), ClassLoaders.MODULE
                     )
@@ -2094,7 +2098,7 @@ object JavaEngine {
                         }.build()
                         val resp = okhttp3.OkHttpClient().newCall(req).execute()
                         val file = File(path)
-                        Files.copy(resp.body.byteStream(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        file.toPath().copyFrom(resp.body.byteStream())
                         pluginLog(plugin, "DOWNLOAD success status=${resp.code} bytes=${file.length()} path=${file.absolutePath}")
                         cb.accept(file)
                     }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
@@ -2122,7 +2126,7 @@ object JavaEngine {
                             .build()
                         val resp = client.newCall(req).execute()
                         val file = File(path)
-                        Files.copy(resp.body.byteStream(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        file.toPath().copyFrom(resp.body.byteStream())
                         pluginLog(plugin, "DOWNLOAD success status=${resp.code} bytes=${file.length()} path=${file.absolutePath}")
                         cb.accept(file)
                     }.onFailure { pluginLog(plugin, "HTTP failed: ${it.javaClass.simpleName}: ${it.message}"); cb.accept(null) }
@@ -2535,7 +2539,7 @@ object JavaEngine {
                     runCatching {
                         val url = content.replaceFirst("\\[AtWx=([^]]+)]".toRegex(), "$1")
                         val resp = okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(url).build()).execute()
-                        Files.copy(resp.body.byteStream(), java.nio.file.Paths.get(savePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        java.nio.file.Paths.get(savePath).copyFrom(resp.body.byteStream())
                     }.onFailure { WeLogger.e(TAG, "downloadImg failed", it) }
                 }
             })
