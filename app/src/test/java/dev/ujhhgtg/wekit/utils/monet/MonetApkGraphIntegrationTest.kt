@@ -2,6 +2,7 @@ package dev.ujhhgtg.wekit.utils.monet
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -9,7 +10,7 @@ class MonetApkGraphIntegrationTest {
     @Test
     fun `domestic APK exposes actual drawable tree and references`() {
         val apk = File("/home/ujhhgtg/coding/wechat_8065.apk")
-        require(apk.isFile) { "missing local WeChat 8.0.65 APK" }
+        assumeTrue(apk.isFile, "missing local WeChat 8.0.65 APK")
 
         val graph = MonetApkResourceGraphLoader.load(listOf(apk), "com.tencent.mm")
         val drawable = requireNotNull(graph.node(MonetResourceKey("drawable", "ahj")))
