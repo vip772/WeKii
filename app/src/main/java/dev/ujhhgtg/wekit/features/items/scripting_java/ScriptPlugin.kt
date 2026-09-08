@@ -69,7 +69,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
 
     private const val TAG = "ScriptPlugin"
     private const val DISABLED_FLAG = "disabled.flag"
-    private val SCRIPTS_DIR by lazy { (KnownPaths.moduleData / "plugins").createDirsSafe() }
+    private val SCRIPTS_DIR by lazy { KnownPaths.plugins }
 
     private fun ensureNewScriptsDisabled() {
         runCatching {

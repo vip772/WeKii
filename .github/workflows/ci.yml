@@ -132,3 +132,5 @@ jobs:
         with:
           name: wekit-standard-apk
           path: dist/apk/app-standard-release.apk
+          if-no-files-found: error
+          compression-level: 0
