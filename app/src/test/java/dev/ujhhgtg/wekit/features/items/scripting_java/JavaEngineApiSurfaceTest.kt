@@ -34,6 +34,17 @@ class JavaEngineApiSurfaceTest {
         "BshMethod(\"uploadDeviceStep\", arrayOf(java.lang.Long.TYPE))",
     )
 
+    private val callbackAliasEntrypoints = setOf(
+        "useOnImageDownload", "useOnVideoDownload", "useOnFinderMediaDownload",
+        "useOnProtobufPacket", "useOnMemberChange", "useOnNewFriend",
+    )
+    private val unreadEntrypoints = setOf(
+        "getUnreadCount", "getAllUnreadCount", "clearUnread", "clearAllUnread",
+    )
+    private val plDataEntrypoints = setOf(
+        "getFriendListInfo", "getGroupListInfo", "getGroupMemberListInfo",
+        "insertSystemMsg", "queryHistoryMsg",
+    )
     private val callbackImportFragments = setOf(
         "classManager.addClassLoader(ClassLoaders.MODULE)",
         "importClass(\"me.hd.wauxv.plugin.api.callback.PluginCallBack\")",
@@ -85,6 +96,9 @@ class JavaEngineApiSurfaceTest {
             names.containsAll(originalEntrypoints),
             "An existing WeKii script entrypoint is missing",
         )
+        assertTrue(names.containsAll(callbackAliasEntrypoints), "PL callback alias entrypoint is missing")
+        assertTrue(names.containsAll(unreadEntrypoints), "PL unread entrypoint is missing")
+        assertTrue(names.containsAll(plDataEntrypoints), "PL contact/history entrypoint is missing")
         originalSignatureFragments.forEach { signature ->
             assertTrue(source.contains(signature), "Existing script signature is missing: $signature")
         }
@@ -133,7 +147,8 @@ class JavaEngineApiSurfaceTest {
     fun releaseRulesRetainScriptVisibleMessageModel() {
         val rules = readPluginApiRules()
         assertTrue(
-            rules.contains("-keep class dev.ujhhgtg.wekit.features.api.core.models.MessageInfo { *; }"),
+            rules.contains("-keep class dev.ujhhgtg.wekit.features.api.core.models.MessageInfo { *; }") &&
+                rules.contains("-keep class me.hd.wauxv.data.bean.** { *; }"),
             "MessageInfo getters must remain stable for reflective PL-compatible scripts",
         )
     }
@@ -143,8 +158,11 @@ class JavaEngineApiSurfaceTest {
         val source = readJavaEngineSource()
 
         assertTrue(
-            source.contains("WeKii 当前没有 Protobuf transport runtime"),
-            "Protobuf compatibility entrypoints must report the missing transport runtime",
+            source.contains("executeAllOnProtobufPacket") &&
+                source.contains("ProtobufPacketBean::class.java") &&
+                source.contains("WePacketHelper.sendCgi") &&
+                source.contains("ProtobufSendResultBean"),
+            "Protobuf callbacks and sends must use the real dispatcher with the PL result ABI",
         )
         assertTrue(
             source.contains("registerPlusMenu degraded to message menu"),

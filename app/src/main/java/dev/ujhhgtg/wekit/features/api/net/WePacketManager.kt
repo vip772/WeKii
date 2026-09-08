@@ -4,10 +4,27 @@ import dev.ujhhgtg.wekit.constants.Preferences
 import dev.ujhhgtg.wekit.features.api.net.abc.IWePacketInterceptor
 import dev.ujhhgtg.wekit.utils.WeLogger
 import java.util.concurrent.CopyOnWriteArrayList
-
 object WePacketManager {
 
     private val listeners = CopyOnWriteArrayList<IWePacketInterceptor>()
+    private val observers = CopyOnWriteArrayList<PacketObserver>()
+
+    fun interface PacketObserver {
+        fun onPacket(direction: String, uri: String, cgiId: Int, data: ByteArray, timestamp: Long)
+    }
+
+    fun addObserver(observer: PacketObserver) = observers.addIfAbsent(observer)
+    fun removeObserver(observer: PacketObserver) = observers.remove(observer)
+    fun hasObservers(): Boolean = observers.isNotEmpty()
+
+    private fun notifyObservers(direction: String, uri: String, cgiId: Int, data: ByteArray) {
+        if (observers.isEmpty()) return
+        val timestamp = System.currentTimeMillis()
+        observers.forEach { observer ->
+            runCatching { observer.onPacket(direction, uri, cgiId, data.copyOf(), timestamp) }
+                .onFailure { WeLogger.e("WePacketObserver", "packet observer failed", it) }
+        }
+    }
 
     fun addInterceptor(interceptor: IWePacketInterceptor) = listeners.addIfAbsent(interceptor)
 
@@ -16,6 +33,7 @@ object WePacketManager {
     fun hasInterceptors(): Boolean = listeners.isNotEmpty()
 
     fun handleRequestTamper(uri: String, cgiId: Int, reqBytes: ByteArray): ByteArray? {
+        notifyObservers("request", uri, cgiId, reqBytes)
         if (Preferences.verboseLog) {
             val data = WeProtoData.fromBytes(reqBytes)
             WeLogger.logChunkedI(
@@ -32,6 +50,7 @@ object WePacketManager {
     }
 
     fun handleResponseTamper(uri: String, cgiId: Int, respBytes: ByteArray): ByteArray? {
+        notifyObservers("response", uri, cgiId, respBytes)
         if (Preferences.verboseLog) {
             val data = WeProtoData.fromBytes(respBytes)
             WeLogger.logChunkedI(

@@ -1,8 +1,10 @@
 package me.hd.wauxv.data.bean
 
 import androidx.annotation.Keep
+import dev.ujhhgtg.wekit.features.api.core.WeApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
+import dev.ujhhgtg.wekit.utils.serialization.XmlUtils
 
 @Suppress("unused")
 @Keep
@@ -39,12 +41,16 @@ class MsgInfoBean(
     fun getMsgId(): Long = msgId
     fun getMsgSvrId(): Long = msgSvrId
     fun getType(): Int = type
+    fun getMsgType(): String = type.toString()
     fun getCreateTime(): Long = createTime
+    fun getCreateTimeSeconds(): Long = if (createTime > 100_000_000_000L) createTime / 1000L else createTime
     fun getTalker(): String = talker
     fun getOriginContent(): String = originContent
     fun getImgPath(): String? = imgPath
     fun getLvBuffer(): ByteArray = lvBuffer
     fun getTalkerId(): Int = talkerId
+    fun getSender(): String = getSendTalker()
+    fun getSenderId(): String = getSendTalker()
     fun getMsgSeq(): Long = msgSeq
     fun getOrigin(): Any = origin
 
@@ -117,6 +123,14 @@ class MsgInfoBean(
     fun isVoipVoice(): Boolean = isVoip() && msg.content == "voip_content_voice"
 
     fun isSend(): Boolean = isSendInt == 1
+    fun isSelf(): Boolean = isSend()
+    fun isAppMsg(): Boolean = isApp()
+    fun isRedPacket(): Boolean = isRedBag()
+    fun isMusic(): Boolean {
+        if (!isApp()) return false
+        val appType = XmlUtils.extractXmlTag(originContent, "type").toIntOrNull() ?: return false
+        return appType == 3 || appType == 76
+    }
 
     fun isGroupChat(): Boolean =
         talker.endsWith("@chatroom") || talker.endsWith("@im.chatroom")
@@ -146,6 +160,43 @@ class MsgInfoBean(
         return msg.sender
     }
 
+    fun getText(): String = getContent()
+    fun getXml(): String {
+        val body = if (isGroupChat() && originContent.contains(":\n")) {
+            originContent.substringAfter(":\n")
+        } else {
+            originContent
+        }
+        val start = body.indexOf('<')
+        return if (start >= 0) body.substring(start) else ""
+    }
+    fun getSelfWxId(): String = WeApi.selfWxId
+    fun getNativeUrl(): String = XmlUtils.extractXmlTag(originContent, "nativeurl")
+    fun getSource(): String = "message_db"
+    fun getKind(): String = when {
+        isRedPacket() -> "red_packet"
+        isTransfer() -> "transfer"
+        isQuote() -> "quote"
+        isFile() -> "file"
+        isPat() -> "pat"
+        isLink() -> "link"
+        isMusic() -> "music"
+        isNote() -> "note"
+        isVideoNumberVideo() -> "video_number_video"
+        isText() -> "text"
+        isImage() -> "image"
+        isVoice() -> "voice"
+        isVideo() -> "video"
+        isEmoji() -> "emoji"
+        isLocation() -> "location"
+        isShareCard() -> "card"
+        isVoip() -> "voip"
+        isSystem() -> "system"
+        isAppMsg() -> "app"
+        else -> "unknown"
+    }
+    fun getMessage(): Any = origin
+    fun getStoredMessage(): Any = origin
     fun getContent(): String {
         return when {
             isText() -> msg.actualContent
@@ -182,6 +233,7 @@ class MsgInfoBean(
 
     fun getFileMsg(): FileMsg? = if (isFile()) FileMsg(msg.toFileMessage() ?: return null) else null
     fun getImageMsg(): ImageMsg? = if (isImage() && originContent.isNotEmpty()) ImageMsg(msg.toImageMessage() ?: return null) else null
+    fun getVideoMsg(): VideoMsg? = if (isVideo()) VideoMsg(originContent) else null
     fun getQuoteMsg(): QuoteMsg? = if (isQuote()) QuoteMsg(msg.toQuoteMessage() ?: return null) else null
     fun getTransferMsg(): TransferMsg? = if (isTransfer()) TransferMsg(msg.toTransferMessage() ?: return null) else null
     fun getPatMsg(): PatMsg? = if (isPat()) PatMsg(msg.toPatMessage() ?: return null) else null
@@ -210,6 +262,18 @@ class MsgInfoBean(
         fun getKey(): String = msg.aesKey
     }
 
+    @Keep
+    class VideoMsg(private val xml: String) {
+        fun getMd5(): String = attrOrTag("md5")
+        fun getNewMd5(): String = attrOrTag("newmd5")
+        fun getCdnVideoUrl(): String = attrOrTag("cdnvideourl")
+        fun getAesKey(): String = attrOrTag("aeskey")
+        fun getKey(): String = getAesKey()
+        fun getLength(): Long = attrOrTag("length").toLongOrNull() ?: 0L
+        fun getPlayLength(): Int = attrOrTag("playlength").toIntOrNull() ?: 0
+        private fun attrOrTag(name: String): String =
+            XmlUtils.extractXmlAttr(xml, name).ifBlank { XmlUtils.extractXmlTag(xml, name) }
+    }
     @Keep
     class QuoteMsg(val msg: MessageInfo.QuoteMessage) {
         fun getTitle() = msg.title

@@ -25,6 +25,7 @@ import dev.ujhhgtg.wekit.features.api.core.WeApi
 import dev.ujhhgtg.wekit.features.api.core.WeAuthApi
 import dev.ujhhgtg.wekit.features.api.core.WeContactApi
 import dev.ujhhgtg.wekit.features.api.core.WeContactLabelApi
+import dev.ujhhgtg.wekit.features.api.core.WeConversationApi
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeGroupApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
@@ -34,6 +35,11 @@ import dev.ujhhgtg.wekit.features.items.system.servers.WeChatService
 
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
+import dev.ujhhgtg.wekit.features.api.net.WePacketHelper
+import dev.ujhhgtg.wekit.features.api.net.abc.WeRequestCallback
+import me.hd.wauxv.data.bean.ProtobufPacketBean
+import me.hd.wauxv.data.bean.ProtobufSendResultBean
+
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
 import android.graphics.drawable.ColorDrawable
@@ -101,11 +107,11 @@ object JavaEngine {
     private fun findScriptMethod(plugin: JavaPlugin, callbackName: String, signatures: Array<Class<*>>): BshMethod? {
         val namespace = plugin.interpreter.nameSpace
         val direct = namespace.getMethod(callbackName, signatures)
-            ?: namespace.getMethod(callbackName, arrayOf(any))
+            ?: namespace.getMethod(callbackName, Array(signatures.size) { any })
         if (direct != null) return direct
         val alias = callbackAliases[plugin.name]?.get(callbackName) ?: return null
         return namespace.getMethod(alias, signatures)
-            ?: namespace.getMethod(alias, arrayOf(any))
+            ?: namespace.getMethod(alias, Array(signatures.size) { any })
     }
 
     private fun setCallbackAlias(plugin: JavaPlugin, callbackName: String, methodName: String) {
@@ -234,7 +240,8 @@ object JavaEngine {
     ) {
         scripts.values.forEach { plugin ->
             try {
-                val bshMethod = plugin.interpreter.nameSpace.getMethod(
+                val bshMethod = findScriptMethod(
+                    plugin,
                     "onMemberChange",
                     arrayOf(String::class.java, String::class.java, String::class.java, String::class.java)
                 )
@@ -256,7 +263,8 @@ object JavaEngine {
     ) {
         scripts.values.forEach { plugin ->
             try {
-                val bshMethod = plugin.interpreter.nameSpace.getMethod(
+                val bshMethod = findScriptMethod(
+                    plugin,
                     "onNewFriend",
                     arrayOf(String::class.java, String::class.java, int)
                 )
@@ -266,6 +274,20 @@ object JavaEngine {
                 }
             } catch (e: Exception) {
                 WeLogger.e(TAG, "onNewFriend execution failed for script ${plugin.name}", e)
+            }
+        }
+    }
+
+    fun executeAllOnProtobufPacket(
+        scripts: Map<String, JavaPlugin>,
+        packet: ProtobufPacketBean,
+    ) {
+        scripts.values.forEach { plugin ->
+            try {
+                findScriptMethod(plugin, "onProtobufPacket", arrayOf(ProtobufPacketBean::class.java))
+                    ?.invoke(arrayOf(packet), plugin.interpreter)
+            } catch (e: Exception) {
+                WeLogger.e(TAG, "onProtobufPacket execution failed for script ${plugin.name}", e)
             }
         }
     }
@@ -464,6 +486,33 @@ object JavaEngine {
             setMethod(BshMethod("useOnClickSendBtn", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onClickSendBtn", a[0] as String); null })
             setMethod(BshMethod("useOnLongClickSendBtn", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onLongClickSendBtn", a[0] as String); null })
             setMethod(BshMethod("useOnHandleMsg", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onHandleMsg", a[0] as String); null })
+            setMethod(BshMethod("useOnImageDownload", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onImageDownload", a[0] as String); null })
+            setMethod(BshMethod("useOnVideoDownload", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onVideoDownload", a[0] as String); null })
+            setMethod(BshMethod("useOnFinderMediaDownload", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onFinderMediaDownload", a[0] as String); null })
+            setMethod(BshMethod("useOnProtobufPacket", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onProtobufPacket", a[0] as String); null })
+            setMethod(BshMethod("useOnMemberChange", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onMemberChange", a[0] as String); null })
+            setMethod(BshMethod("useOnNewFriend", arrayOf(BString)) { a -> setCallbackAlias(plugin, "onNewFriend", a[0] as String); null })
+
+            setMethod(BshMethod("getUnreadCount", arrayOf(BString)) { a ->
+                val talker = a[0] as String
+                if (talker.isBlank()) return@BshMethod 0
+                WeDatabaseApi.rawQuery("SELECT unReadCount FROM rconversation WHERE username=? LIMIT 1", arrayOf(talker)).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getInt(0).coerceAtLeast(0) else 0
+                }
+            })
+            setMethod(BshMethod("getAllUnreadCount", emptyArray<Class<*>>()) {
+                WeDatabaseApi.rawQuery("SELECT COALESCE(SUM(unReadCount),0) FROM rconversation WHERE unReadCount>0").use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getInt(0).coerceAtLeast(0) else 0
+                }
+            })
+            setMethod(BshMethod("clearUnread", arrayOf(BString)) { a ->
+                val talker = a[0] as String
+                if (talker.isBlank()) return@BshMethod false
+                runCatching { WeConversationApi.markAsRead(talker); true }.getOrElse { false }
+            })
+            setMethod(BshMethod("clearAllUnread", emptyArray<Class<*>>()) {
+                runCatching { WeConversationApi.markAllAsRead(); true }.getOrElse { false }
+            })
 
             // ===== FileSystem Info =====
 
@@ -953,6 +1002,24 @@ object JavaEngine {
                     }.getOrDefault(emptyList<Any>())
                 })
 
+            setMethod(
+                BshMethod("getFriendListInfo", emptyArray<Class<*>>()) {
+                    return@BshMethod runCatchingBsh("getFriendListInfo") {
+                        WeDatabaseApi.getFriends().map { contact ->
+                            linkedMapOf<String, Any?>(
+                                "wxid" to contact.wxId,
+                                "nickname" to contact.nickname,
+                                "remarkName" to contact.remarkName,
+                                "displayName" to contact.displayName,
+                                "customWxId" to contact.customWxId,
+                                "avatarUrl" to contact.avatarUrl,
+                                "encryptedUsername" to contact.encryptedUsername,
+                                "type" to contact.type,
+                            )
+                        }
+                    }.getOrDefault(emptyList())
+                }
+            )
             // getGroupList() → list of GroupInfo objects
             setMethod(
                 BshMethod(
@@ -963,6 +1030,26 @@ object JavaEngine {
                     }.getOrDefault(emptyList<Any>())
                 })
 
+            setMethod(
+                BshMethod("getGroupListInfo", emptyArray<Class<*>>()) {
+                    return@BshMethod runCatchingBsh("getGroupListInfo") {
+                        WeDatabaseApi.getGroups().map { group ->
+                            val data = me.hd.wauxv.data.bean.info.GroupData(group.wxId)
+                            linkedMapOf<String, Any?>(
+                                "roomId" to group.wxId,
+                                "name" to group.nickname,
+                                "nickname" to group.nickname,
+                                "remarkName" to "",
+                                "displayName" to group.displayName,
+                                "owner" to data.owner,
+                                "memberCount" to data.memberCount,
+                                "memberList" to data.memberIds,
+                                "rawDisplayNames" to data.memberNames.joinToString(","),
+                            )
+                        }
+                    }.getOrDefault(emptyList())
+                }
+            )
             // getOfficialList() → list of FriendInfo objects
             setMethod(
                 BshMethod(
@@ -970,7 +1057,12 @@ object JavaEngine {
                 ) {
                     return@BshMethod runCatchingBsh("getOfficialList") {
                         WeDatabaseApi.getOfficialAccounts().map {
-                            FriendInfo(it.wxId, "", "", it.nickname, 0, "", 0L)
+                            FriendInfo(
+                                wxid = it.wxId,
+                                nickname = it.nickname,
+                                type = 0,
+                                avatarUrl = it.avatarUrl,
+                            )
                         }
                     }.getOrDefault(emptyList<Any>())
                 })
@@ -982,13 +1074,32 @@ object JavaEngine {
                 ) {
                     val groupId = it[0] as String
                     return@BshMethod runCatchingBsh("getGroupMemberList") {
-                        WeServiceApi.chatroomStorage.reflekt().firstMethod {
-                            parameters(BString)
-                            returnType = List::class
-                        }.invoke(groupId)
-                    }.getOrDefault(emptyList<Any>())
+                        WeDatabaseApi.getGroupMembers(groupId).map { member -> member.wxId }
+                    }.getOrDefault(emptyList<String>())
                 })
 
+            setMethod(
+                BshMethod("getGroupMemberListInfo", arrayOf(BString)) {
+                    val groupId = it[0] as String
+                    if (groupId.isBlank()) return@BshMethod emptyList<Map<String, Any?>>()
+                    return@BshMethod runCatchingBsh("getGroupMemberListInfo") {
+                        WeDatabaseApi.getGroupMembers(groupId).map { member ->
+                            val groupNickname = WeDatabaseApi.getGroupMemberDisplayName(groupId, member.wxId)
+                            linkedMapOf<String, Any?>(
+                                "wxid" to member.wxId,
+                                "displayName" to groupNickname.ifBlank { member.displayName },
+                                "groupNickname" to groupNickname,
+                                "nickname" to member.nickname,
+                                "remarkName" to member.remarkName,
+                                "customWxId" to member.customWxId,
+                                "avatarUrl" to member.avatarUrl,
+                                "encryptedUsername" to member.encryptedUsername,
+                                "type" to member.type,
+                            )
+                        }
+                    }.getOrDefault(emptyList())
+                }
+            )
             setMethod(
                 BshMethod(
                     "getGroupMemberCount", arrayOf(BString)
@@ -996,9 +1107,8 @@ object JavaEngine {
                     val groupId = it[0] as String
                     return@BshMethod runCatchingBsh("getGroupMemberCount") {
                         WeDatabaseApi.getGroupMembers(groupId).size
-                    }.getOrDefault(emptyList<Any>())
+                    }.getOrDefault(0)
                 })
-
             // ===== Contact Detail =====
 
             // getFriendNickName(wxId) → contact's nickname
@@ -1286,9 +1396,11 @@ object JavaEngine {
                     val talker = it[0] as String
                     val content = it[1] as String
                     val time = it[2] as Long
-                    runCatchingBsh("insertSystemMsg") {
-                        WeMessageApi.createSimpleMsgInfoAndInsert(MessageType.SYSTEM.code, talker, content, time)
-                    }
+                    return@BshMethod runCatchingBsh("insertSystemMsg") {
+                        if (talker.isBlank() || content.isBlank()) 0L else {
+                            WeMessageApi.createSimpleMsgInfoAndInsert(MessageType.SYSTEM.code, talker, content, time)
+                        }
+                    }.getOrDefault(0L)
                 })
 
             setMethod(
@@ -1335,16 +1447,19 @@ object JavaEngine {
 
             // ===== Database =====
 
-            // queryHistoryMsg(talker, msgSvrId, limit) → list of WeMessage objects
+            // queryHistoryMsg(talker, startTime, limit) → list of PL-compatible MsgInfoBean objects
             setMethod(
                 BshMethod(
                     "queryHistoryMsg", arrayOf(BString, java.lang.Long.TYPE, int)
                 ) {
                     val talker = it[0] as String
+                    val startTime = it[1] as Long
                     val limit = it[2] as Int
+                    if (talker.isBlank() || limit <= 0) return@BshMethod emptyList<MsgInfoBean>()
                     return@BshMethod runCatchingBsh("queryHistoryMsg") {
-                        WeDatabaseApi.getMessages(talker, 1, limit)
-                    }.getOrDefault(emptyList<Any>())
+                        WeMessageApi.queryHistoryMsg(talker, startTime, limit)
+                            .map { message -> MsgInfoBean(message.instance) }
+                    }.getOrDefault(emptyList())
                 })
 
             // ===== Extended Messaging (Step 3d) =====
@@ -2433,23 +2548,50 @@ object JavaEngine {
                     callback.accept(mapOf("type" to "progress", "progress" to 100, "code" to result, "sampleRate" to sampleRate))
                 }
             })
-            // The current WeKii hook layer has no protobuf transport runtime. Keep the
-            // pl signatures callable and report the capability gap through the callback.
-            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, BString)) { false })
+            fun sendProtobuf(uri: String, cgiId: Int, funcId: Int, routeId: Int, json: String, callback: Consumer<Any?>?): Boolean {
+                if (uri.isBlank() || cgiId <= 0) {
+                    callback?.accept(ProtobufSendResultBean(false, "uri/cgiId 无效"))
+                    return false
+                }
+                return runCatchingBsh("sendProtobufPacket") {
+                    WePacketHelper.sendCgi(uri, cgiId, funcId, routeId, json, object : WeRequestCallback {
+                        override fun onSuccess(bytes: ByteArray?) {
+                            callback?.accept(ProtobufSendResultBean(true, "发送成功"))
+                        }
+                        override fun onFailure(errType: Int, errCode: Int, errMsg: String) {
+                            val message = errMsg.ifBlank { "发送失败($errType/$errCode)" }
+                            callback?.accept(ProtobufSendResultBean(false, message))
+                        }
+                    })
+                    true
+                }.getOrElse { error ->
+                    callback?.accept(ProtobufSendResultBean(false, error.message ?: error.javaClass.simpleName))
+                    false
+                }
+            }
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, BString)) { args ->
+                sendProtobuf(args[0] as String, args[1] as Int, 0, 0, args[2] as String, null)
+            })
             setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, BString, Consumer::class.java)) { args ->
-                (args[3] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+                sendProtobuf(args[0] as String, args[1] as Int, 0, 0, args[2] as String, args[3] as Consumer<Any?>)
             })
-            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, org.json.JSONObject::class.java)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, org.json.JSONObject::class.java)) { args ->
+                sendProtobuf(args[0] as String, args[1] as Int, 0, 0, (args[2] as org.json.JSONObject).toString(), null)
+            })
             setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, org.json.JSONObject::class.java, Consumer::class.java)) { args ->
-                (args[3] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+                sendProtobuf(args[0] as String, args[1] as Int, 0, 0, (args[2] as org.json.JSONObject).toString(), args[3] as Consumer<Any?>)
             })
-            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, BString)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, BString)) { args ->
+                sendProtobuf(args[0] as String, args[1] as Int, args[2] as Int, args[3] as Int, args[4] as String, null)
+            })
             setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, BString, Consumer::class.java)) { args ->
-                (args[5] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+                sendProtobuf(args[0] as String, args[1] as Int, args[2] as Int, args[3] as Int, args[4] as String, args[5] as Consumer<Any?>)
             })
-            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, org.json.JSONObject::class.java)) { false })
+            setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, org.json.JSONObject::class.java)) { args ->
+                sendProtobuf(args[0] as String, args[1] as Int, args[2] as Int, args[3] as Int, (args[4] as org.json.JSONObject).toString(), null)
+            })
             setMethod(BshMethod("sendProtobufPacket", arrayOf(BString, int, int, int, org.json.JSONObject::class.java, Consumer::class.java)) { args ->
-                (args[5] as Consumer<Any?>).accept(mapOf("success" to false, "message" to "WeKii 当前没有 Protobuf transport runtime")); false
+                sendProtobuf(args[0] as String, args[1] as Int, args[2] as Int, args[3] as Int, (args[4] as org.json.JSONObject).toString(), args[5] as Consumer<Any?>)
             })
             // WeKii has no plus-menu dispatcher. Registering through the existing message
             // menu keeps the API callable while making the degraded behavior explicit.

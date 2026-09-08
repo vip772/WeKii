@@ -694,7 +694,7 @@ object WeMessageApi : ApiFeature(), IResolveDex {
         return msgInfo
     }
 
-    fun createSimpleMsgInfoAndInsert(type: Int, talker: String, content: String, currentTime: Long) {
+    fun createSimpleMsgInfoAndInsert(type: Int, talker: String, content: String, currentTime: Long): Long {
         val values = ContentValues().apply {
             put("msgid", 0)
             put("msgSvrId", currentTime + Random.nextInt())
@@ -705,10 +705,13 @@ object WeMessageApi : ApiFeature(), IResolveDex {
             put("content", content)
         }
         val msgInfo = convertMsgInfoInstanceFromContentValues(values)
-        methodMsgInfoStorageInsertMessage.method.invoke(
+        val result = methodMsgInfoStorageInsertMessage.method.invoke(
             WeServiceApi.msgInfoStorage,
             msgInfo
         )
+        val insertedId = (result as? Number)?.toLong() ?: 0L
+        return insertedId.takeIf { it > 0L }
+            ?: runCatching { MessageInfo(msgInfo).id }.getOrDefault(0L)
     }
 
     fun revokeMsg(msgInfo: MessageInfo): Boolean {
@@ -780,6 +783,30 @@ object WeMessageApi : ApiFeature(), IResolveDex {
         return methodGetMsgInfoByTalkerAndSvrId.method.invoke(
             WeServiceApi.msgInfoStorage, resolvedTalker, msgSvrId
         )!!
+    }
+
+    fun queryHistoryMsg(talker: String, startTime: Long, count: Int): List<MessageInfo> {
+        if (talker.isBlank() || count <= 0) return emptyList()
+        val normalizedStartTime = when {
+            startTime <= 0L -> Long.MAX_VALUE
+            startTime < 100_000_000_000L -> startTime * 1000L
+            else -> startTime
+        }
+        return try {
+            WeDatabaseApi.rawQuery(
+                "SELECT * FROM message WHERE talker=? AND createTime<? ORDER BY createTime DESC LIMIT ?",
+                arrayOf(talker, normalizedStartTime, count),
+            ).use { cursor ->
+                buildList {
+                    while (cursor.moveToNext()) {
+                        add(MessageInfo(convertMsgInfoInstanceFromCursor(cursor)))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "queryHistoryMsg failed; talker=$talker, startTime=$startTime, count=$count", e)
+            emptyList()
+        }
     }
 
     fun convertMsgInfoInstanceFromCursor(cursor: Cursor): Any {

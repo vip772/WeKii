@@ -58,7 +58,7 @@ object WePacketDispatcher : ApiFeature(), IResolveDex {
                     val v0Ref = v0Var.reflekt()
                     val uri = v0Ref.invokeMethod("getUri", superclass = true) as? String? ?: "null"
                     val cgiId = v0Ref.invokeMethod("getType", superclass = true) as Int
-                    if (!Preferences.verboseLog && !WePacketManager.hasInterceptors()) return@hookBefore
+                    if (!Preferences.verboseLog && !WePacketManager.hasInterceptors() && !WePacketManager.hasObservers()) return@hookBefore
 
                     try {
                         val reqWrapper = v0Ref.invokeMethod("getReqObj", superclass = true)!!

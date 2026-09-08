@@ -1,5 +1,6 @@
 # Public BeanShell plugin API names are part of the external script ABI.
 -keep class me.hd.wauxv.plugin.api.callback.** { *; }
+-keep class me.hd.wauxv.data.bean.** { *; }
 
 # registerMessageMenu/registerPlusMenu callbacks expose MessageInfo to scripts.
 # PL-compatible scripts resolve getTalker/getContent/getText by reflection, so

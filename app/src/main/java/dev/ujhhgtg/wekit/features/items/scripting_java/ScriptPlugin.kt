@@ -23,6 +23,8 @@ import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseListenerApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
+import dev.ujhhgtg.wekit.features.api.net.WePacketManager
+import me.hd.wauxv.data.bean.ProtobufPacketBean
 import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
@@ -86,6 +88,13 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
     private val lifecycleLock = Any()
     private var loadJob: Job? = null
     private var lifecycleGeneration = 0L
+    private val packetObserver = WePacketManager.PacketObserver { direction, uri, cgiId, data, timestamp ->
+        JavaEngine.executeAllOnProtobufPacket(
+            scripts,
+            ProtobufPacketBean(direction, uri, cgiId, data, timestamp),
+        )
+    }
+    // Media-download callbacks remain gated until verified host completion hooks are available.
 
     private data class ScriptEntry(
         val dir: Path,
@@ -101,6 +110,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
 
     override fun onEnable() {
         ensureNewScriptsDisabled()
+        WePacketManager.addObserver(packetObserver)
         val generation = synchronized(lifecycleLock) {
             lifecycleGeneration += 1
             lifecycleGeneration
@@ -288,6 +298,7 @@ object ScriptPlugin : ClickableFeature(), IResolveDex, WeDatabaseListenerApi.IUp
     }
 
     override fun onDisable() {
+        WePacketManager.removeObserver(packetObserver)
         synchronized(lifecycleLock) {
             lifecycleGeneration += 1
         }

@@ -17,7 +17,7 @@ class ContactLabelBean(
     fun getLabelId() = origin.labelId
     fun getLabelID() = origin.labelId
     fun getId() = origin.labelId
-    fun getOrigin(): Any = error("not implemented")
+    fun getOrigin(): Any = origin
 
     override fun toString(): String {
         return buildJsonObject {
