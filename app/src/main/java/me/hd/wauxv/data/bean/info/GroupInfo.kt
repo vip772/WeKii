@@ -10,16 +10,16 @@ data class GroupInfo(
     var name: String = "",
     var groupData: GroupData = GroupData()
 ) {
-    fun getRoomId(): String = roomId
+    // roomId, remark, and name already expose getRoomId(), getRemark(), and
+    // getName() to Java/BeanShell. Keep only additional PL compatibility names.
     fun getChatroomId(): String = roomId
     fun getWxid(): String = roomId
     fun getWxId(): String = roomId
     fun getUserName(): String = roomId
-    fun getName(): String = name
     fun getNickname(): String = name
     fun getNickName(): String = name
-    fun getRemark(): String = remark
     fun getRemarkName(): String = remark
+
     fun getDisplayName(): String = when {
         remark.isNotEmpty() && remark != name -> if (name.isEmpty()) remark else "$remark ($name)"
         name.isNotEmpty() -> name

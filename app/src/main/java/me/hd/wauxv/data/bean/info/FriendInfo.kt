@@ -18,23 +18,18 @@ data class FriendInfo(
     var city: String = "",
     var gender: Int = 0
 ) {
-    fun getWxid(): String = wxid
+    // Kotlin properties already generate JavaBean getters such as getWxid(),
+    // getNickname(), and getAvatarUrl(). Keep only compatibility aliases whose
+    // JVM names differ from those generated accessors.
     fun getWxId(): String = wxid
     fun getUserName(): String = wxid
     fun getUsername(): String = wxid
-    fun getNickname(): String = nickname
     fun getNickName(): String = nickname
-    fun getRemark(): String = remark
     fun getRemarkName(): String = remark
-    fun getAlias(): String = alias
-    fun getAvatarUrl(): String = avatarUrl
-    fun getAvatarBackupUrl(): String = avatarBackupUrl
     fun getEncryptedUsername(): String = sourceExtInfo
-    fun getProvince(): String = province
-    fun getCity(): String = city
     fun getRegion(): String = listOf(province, city).filter { it.isNotEmpty() }.joinToString(" ")
-    fun getGender(): Int = gender
     fun getSex(): Int = gender
+
     fun getName(): String = when {
         remark.isNotEmpty() && nickname.isNotEmpty() -> "$remark ($nickname)"
         remark.isNotEmpty() -> remark
@@ -42,8 +37,7 @@ data class FriendInfo(
         else -> wxid
     }
     fun getDisplayName(): String = getName()
-    fun getType(): Int = type
-    fun getCreateTime(): Long = createTime
+
     fun isGroup(): Boolean = wxid.endsWith("@chatroom") || wxid.endsWith("@im.chatroom")
     fun isOfficialAccount(): Boolean = wxid.startsWith("gh_")
 
