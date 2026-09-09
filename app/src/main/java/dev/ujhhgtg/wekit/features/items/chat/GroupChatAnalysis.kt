@@ -926,7 +926,17 @@ private data class GroupAnalysisStats(
 )
 
 private object GroupChatAnalysisEngine {
-    private val groupSenderRegex = Regex("""^([^\n:]+):\n(.*)$""", setOf(RegexOption.DOT_MATCHES_ALL))
+    private val groupSenderRegex = Regex("""^([^\r\n:]+):(?:\r?\n(.*))?$""", setOf(RegexOption.DOT_MATCHES_ALL))
+    private val nonSpeakerMessageTypes = setOf(10000, 10002, 10008)
+
+    private fun resolveSenderId(raw: String, isSend: Boolean, memberAliases: Map<String, String>): String {
+        if (isSend) return WeApi.selfWxId
+        val prefix = groupSenderRegex.find(raw)?.groupValues?.get(1)?.trim().orEmpty()
+        if (prefix.isBlank()) return ""
+        // Normalize wxid/nickname/display name to one stable ID; retain unknown
+        // prefixes so a valid but not-yet-synced member is not silently dropped.
+        return memberAliases[prefix] ?: prefix
+    }
 
     suspend fun loadFastStats(talker: String): GroupAnalysisStats {
         val now = Calendar.getInstance()
@@ -961,18 +971,12 @@ private object GroupChatAnalysisEngine {
             val typeIndex = cursor.getColumnIndexOrThrow("type")
             while (cursor.moveToNext()) {
                 val type = cursor.getInt(typeIndex)
-                if (type == 10000 || type == 10002 || type == 10008) continue
-                val senderId = if (cursor.getInt(sendIndex) != 0) {
-                    WeApi.selfWxId
-                } else {
-                    val firstLine = cursor.getString(contentIndex).orEmpty()
-                        .substringBefore('\n').substringBefore('\r')
-                    val separator = firstLine.indexOf(':')
-                    if (separator <= 0) "" else {
-                        val prefix = firstLine.substring(0, separator).trim()
-                        memberAliases[prefix] ?: prefix
-                    }
-                }
+                if (type in nonSpeakerMessageTypes) continue
+                val senderId = resolveSenderId(
+                    raw = cursor.getString(contentIndex).orEmpty(),
+                    isSend = cursor.getInt(sendIndex) != 0,
+                    memberAliases = memberAliases,
+                )
                 if (senderId.isNotBlank()) todaySenders += senderId
             }
         }
@@ -999,6 +1003,19 @@ private object GroupChatAnalysisEngine {
         }
         val members = runCatching { WeDatabaseApi.getGroupMembers(talker) }.getOrDefault(emptyList())
         val memberNames = members.associate { it.wxId to (it.displayName.ifBlank { it.nickname }.ifBlank { "未知成员" }) }
+        val memberAliases = buildMap {
+            members.forEach { member ->
+                listOf(
+                    member.wxId,
+                    member.nickname,
+                    member.displayName,
+                    runCatching { WeDatabaseApi.getGroupMemberDisplayName(talker, member.wxId) }.getOrDefault(""),
+                )
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .forEach { put(it, member.wxId) }
+            }
+        }
         val rows = ArrayList<AnalysisMessage>()
         val ranking = linkedMapOf<String, Int>()
         val todayRanking = linkedMapOf<String, Int>()
@@ -1034,9 +1051,10 @@ private object GroupChatAnalysisEngine {
                 val createTime = cursor.getLong(timeIndex)
                 val type = cursor.getInt(typeIndex)
                 val isSend = cursor.getInt(sendIndex) != 0
+                if (type in nonSpeakerMessageTypes) continue
                 val match = if (isSend) null else groupSenderRegex.find(raw)
-                val senderId = if (isSend) WeApi.selfWxId else match?.groupValues?.get(1)?.trim().orEmpty()
-                val contentBody = if (isSend) raw else match?.groupValues?.get(2) ?: raw
+                val senderId = resolveSenderId(raw, isSend, memberAliases)
+                val contentBody = if (isSend) raw else match?.groupValues?.getOrNull(2) ?: raw
                 val senderName = if (isSend) localizedSenderMe() else memberNames[senderId] ?: "未知成员"
                 // 今日消息数按数据库中的消息行统计，不能依赖发送者解析或消息类型。
                 if (createTime >= todayStart) todayMessages++
