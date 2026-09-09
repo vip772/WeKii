@@ -147,9 +147,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 model = models.firstOrNull { it.id == selectedModelId } ?: models.firstOrNull()
             }
             LaunchedEffect(Unit) { reloadModels() }
-            LaunchedEffect(Unit) {
-                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.loadFastStats(message.talker) } }
-                    .onSuccess { stats = it }.onFailure { error = it.message }
+            LaunchedEffect(range) {
+                runCatching { withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) } }
+                    .onSuccess { stats = it.stats }.onFailure { error = it.message }
             }
 
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
@@ -178,9 +178,9 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("核心指标", color = accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         MetricTripleRow(
-                            MetricData("今日发言人数", it.todayActiveUsers.toString(), MaterialSymbols.Outlined.Groups),
-                            MetricData("今日消息数", it.todayMessages.toString(), MaterialSymbols.Outlined.Chat),
-                            MetricData("历史总消息", it.historyTotalMessages.toString(), MaterialSymbols.Outlined.History),
+                            MetricData("时段发言人数", it.activeUsers.toString(), MaterialSymbols.Outlined.Groups),
+                            MetricData("时段消息数", it.totalMessages.toString(), MaterialSymbols.Outlined.Chat),
+                            MetricData("抽样消息数", it.totalMessages.toString(), MaterialSymbols.Outlined.History),
                         )
                         }
                     }
@@ -215,7 +215,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                                 busy = true; error = null; report = ""
                                 scope.launch { runCatching {
                                     val loaded = withContext(Dispatchers.IO) { GroupChatAnalysisEngine.load(message.talker, range) }
-                                    // 生成报告只使用本次快照，不能覆盖核心指标区的首次加载数据。
+                                    stats = loaded.stats
                                     GroupChatAnalysisEngine.streamReport(model!!, loaded.messages, extra) { report += it }
                                 }.onFailure { error = it.message ?: it.javaClass.simpleName }; busy = false }
                             },
@@ -225,7 +225,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp).padding(end = 4.dp), strokeWidth = 2.dp)
                             Text(stringResource(R.string.group_chat_analysis_generate_summary))
                         }
-                        Button(onClick = { reportImagePath = runCatching { createReportImage(message.talker, report, stats) }.getOrNull(); shareReportOpen = true }, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer), modifier = Modifier.weight(1f), enabled = report.isNotBlank() && !busy) { Text("生成截图") }
+                        Button(onClick = { reportImagePath = runCatching { createReportImage(message.talker, report, stats, range) }.getOrNull(); shareReportOpen = true }, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccentContainer), modifier = Modifier.weight(1f), enabled = report.isNotBlank() && !busy) { Text("生成截图") }
                         }
                         if (report.isBlank() && !busy) Text(stringResource(R.string.group_chat_analysis_summary_hint), style = MaterialTheme.typography.bodySmall)
                         if (report.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = accentContainer, contentColor = onAccentContainer)) {
@@ -248,7 +248,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                 text = { SamplingSettings(sampleLimit, contextCapacity, { sampleLimit = it }, { contextCapacity = it }) },
                 confirmButton = { TextButton(onClick = { modelSamplingOpen = false }) { Text("完成") } },
             )
-            if (shareReportOpen) ReportShareDialog(message.talker, report, stats, reportImagePath, { shareReportOpen = false })
+            if (shareReportOpen) ReportShareDialog(message.talker, report, stats, range, reportImagePath, { shareReportOpen = false })
             if (settingsOpen && settingsSeed != null) ApiSettingsDialog(settingsSeed!!, { settingsOpen = false }) { draft -> scope.launch {
                 val providerId = draft.providerId.ifBlank { "group-analysis-${UUID.randomUUID()}" }
                 val provider = ModelProviderEntity(providerId, ModelProviderType.OPENAI_CHAT_COMPLETION, "群聊分析 API", normalizeApiBase(draft.baseUrl, draft.apiPath), draft.apiKey)
@@ -687,7 +687,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         AlertDialog(onDismissRequest=onDismiss,shape=RoundedCornerShape(28.dp),title={Text("群聊成员",fontWeight=FontWeight.Bold)},text={Column(Modifier.fillMaxWidth().heightIn(max=550.dp)){ OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("搜索成员")},shape=RoundedCornerShape(16.dp)); Spacer(Modifier.height(8.dp)); Column(Modifier.verticalScroll(rememberScrollState())) { visible.forEach { m -> val checked=m.wxId in selected; Row(Modifier.fillMaxWidth().clickable{selected=if(checked)selected-m.wxId else selected+m.wxId}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){ Checkbox(checked,null); if(m.avatarUrl.isNotBlank()) AsyncImage(m.avatarUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(40.dp).clip(CircleShape)) else Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),contentAlignment=Alignment.Center){Text(m.nickname.take(1))}; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)){Text(m.remarkName.ifBlank{m.nickname});Text(m.wxId,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}; if(m.wxId in ids) Text("未发言",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelSmall) } } } }},confirmButton={TextButton(onClick={WeGroupApi.delMembers(talker,selected.toList());onDismiss()}, enabled=selected.isNotEmpty()){Text("移除选中成员")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
     }
     @Composable
-    private fun ReportShareDialog(talker: String, report: String, stats: GroupAnalysisStats?, imagePath: String?, onDismiss: () -> Unit) {
+    private fun ReportShareDialog(talker: String, report: String, stats: GroupAnalysisStats?, range: AnalysisRange, imagePath: String?, onDismiss: () -> Unit) {
         val members = remember(talker) { runCatching { WeDatabaseApi.getGroups() }.getOrDefault(emptyList()) }
         var query by remember { mutableStateOf("") }
         val visible = remember(members, query) { members.filter { query.isBlank() || it.displayName.contains(query, true) || it.wxId.contains(query, true) }.sortedWith(compareByDescending<dev.ujhhgtg.wekit.features.api.core.models.WeGroup> { it.wxId == talker }.thenBy { it.displayName }) }
@@ -703,10 +703,10 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
                     }
                 } }
             }
-        }, confirmButton = { TextButton(onClick = { val path = imagePath ?: createReportImage(talker, report, stats); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+        }, confirmButton = { TextButton(onClick = { val path = imagePath ?: createReportImage(talker, report, stats, range); selected.forEach { WeMessageApi.sendImage(it, path) }; onDismiss() }, enabled = selected.isNotEmpty()) { Text("发送") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
     }
 
-    private fun createReportImage(talker: String, report: String, stats: GroupAnalysisStats?): String {
+    private fun createReportImage(talker: String, report: String, stats: GroupAnalysisStats?, range: AnalysisRange): String {
         val width = 1080
         val groupName = WeDatabaseApi.getGroup(talker)?.displayName?.ifBlank { "群聊" } ?: "群聊"
         val memberCount = WeDatabaseApi.getGroupMembers(talker).size
@@ -726,7 +726,7 @@ object GroupChatAnalysis : SwitchFeature(), WeChatMessageContextMenuApi.IMenuIte
         val redPaint = Paint(bodyPaint).apply { color = Color.rgb(178, 48, 55); typeface = android.graphics.Typeface.DEFAULT_BOLD }
         canvas.drawText("群聊分析报告", 50f, 68f, headerPaint)
         canvas.drawText(groupName, 50f, 112f, metaPaint)
-        canvas.drawText("${SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(Date())}  —  ${SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(Date())}", 50f, 142f, metaPaint)
+        canvas.drawText(analysisDateRange(range).replace(" ~ ", "  —  "), 50f, 142f, metaPaint)
         canvas.drawText("群员总数 $memberCount 人    发言人数 ${stats?.activeUsers ?: 0} 人    抽样消息数 $sampledCount 条", 50f, 177f, metaPaint)
         canvas.drawText("生成时间：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}", 50f, 210f, metaPaint)
         var y = 295f
